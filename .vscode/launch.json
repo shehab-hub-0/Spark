@@ -1,1 +1,65 @@
-
+{
+  // VS Code launch configuration for PySpark debugging inside the Dev Container
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "▶ Run main.py (PySpark)",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/main.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "SPARK_HOME": "/opt/spark",
+        "PYSPARK_PYTHON": "python3",
+        "PYSPARK_DRIVER_PYTHON": "python3",
+        "PYTHONPATH": "/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip",
+        "SPARK_LOCAL_IP": "127.0.0.1"
+      }
+    },
+    {
+      "name": "▶ Run current file (PySpark)",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "SPARK_HOME": "/opt/spark",
+        "PYSPARK_PYTHON": "python3",
+        "PYSPARK_DRIVER_PYTHON": "python3",
+        "PYTHONPATH": "/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip",
+        "SPARK_LOCAL_IP": "127.0.0.1"
+      }
+    },
+    {
+      "name": "▶ Debug main.py (PySpark)",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/main.py",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "stopOnEntry": false,
+      "env": {
+        "SPARK_HOME": "/opt/spark",
+        "PYSPARK_PYTHON": "python3",
+        "PYSPARK_DRIVER_PYTHON": "python3",
+        "PYTHONPATH": "/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip",
+        "SPARK_LOCAL_IP": "127.0.0.1"
+      }
+    },
+    {
+      "name": "▶ Pytest",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["tests/", "-v"],
+      "console": "integratedTerminal",
+      "env": {
+        "SPARK_HOME": "/opt/spark",
+        "PYSPARK_PYTHON": "python3",
+        "PYTHONPATH": "/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip"
+      }
+    }
+  ]
+}
