@@ -22,7 +22,7 @@ Spark هو محرك تنفيذ بيانات (Data Execution Engine) فقط. لا
 | **Standalone** | عناقيد Spark مخصصة بالكامل | أبسط إعداداً وأسرع تخصيصاً للموارد |
 
 > [!TIP]
-> **Pro Tip:** إذا كنت تبني منصة بيانات جديدة على السحابة (AWS/GCP/Azure)، اختر **Kubernetes**. إذا كان لديك عنقود Hadoop قديم (Legacy Hadoop Cluster)، ابقَ على **YARN**. إذا كنت في بيئة تعلم أو عنقود Spark مخصص بسيط، استخدم **Standalone**.
+> **Pro Tip:** الاختيار ليس قاعدة مطلقة. إذا كانت منصة Hadoop وHDFS وHive موجودة بالفعل فـ YARN منطقي. إذا كانت المؤسسة تعتمد الحاويات وCI/CD وSecrets وObservability على Kubernetes فـ K8s مناسب. إذا كان العنقود مخصصاً لـ Spark فقط وبسيط التشغيل فـ Standalone يكفي.
 
 ---
 
@@ -179,9 +179,9 @@ Stage 1 يحتاج Shuffle Files التي كانت على Executor 3
 
 | مدير الموارد | الحل | كيف يعمل |
 | :--- | :--- | :--- |
-| **YARN** | External Shuffle Service | `NodeManager` يحتفظ بملفات الـ Shuffle حتى بعد حذف الـ Executor |
+| **YARN** | External Shuffle Service | خدمة Node-level مستقلة تحتفظ بإمكانية تقديم ملفات الـ Shuffle بعد حذف الـ Executor |
 | **Kubernetes** | Shuffle Tracking | Spark يمنع حذف الـ Executor إذا كان يحتوي على Shuffle Files نشطة |
-| **Kubernetes (متقدم)** | Remote Shuffle Service | كتابة الـ Shuffle على تخزين موزع مثل S3 أو MinIO |
+| **Kubernetes (متقدم)** | Remote/External Shuffle Service | حل إضافي خارج Spark core يكتب أو يخدم Shuffle خارج عمر الـ Executor |
 
 **إعداد Shuffle Tracking على Kubernetes:**
 ```properties
@@ -196,11 +196,11 @@ spark.dynamicAllocation.shuffleTracking.timeout=300s
 
 ### وقت إطلاق الـ Executors
 
-| مدير الموارد | وقت إطلاق 10 Executors | وقت إطلاق 100 Executor | السبب |
-| :--- | :--- | :--- | :--- |
-| **Standalone** | ~1.2 ثانية | ~2.5 ثانية | عملية محلية بسيطة، لا طبقات تجريد |
-| **YARN** | ~4.8 ثانية | ~12 ثانية | تفاوض ResourceManager + Cgroups Setup |
-| **Kubernetes** | ~8-15 ثانية | ~25-60 ثانية | سحب Docker Image + Pod Scheduling + Network CNI |
+| مدير الموارد | السلوك المعتاد | السبب |
+| :--- | :--- | :--- |
+| **Standalone** | الأسرع غالباً في عناقيد صغيرة مخصصة | طبقات أقل وإطلاق Executors مباشر |
+| **YARN** | متوسط ويعتمد على ازدحام الـ ResourceManager والـ Queues | تفاوض Containers وعزل Cgroups |
+| **Kubernetes** | قد يكون أبطأ عند سحب Images أو ضغط Scheduler | Pod Scheduling وImage Pull وCNI وAdmission Controllers |
 
 > [!TIP]
 > **Pro Tip:** على Kubernetes، قم بـ Pre-pull الـ Spark Docker Image على جميع الـ Nodes باستخدام DaemonSet لتقليل وقت الإطلاق من ~15 ثانية إلى ~3 ثوانٍ.
@@ -220,18 +220,11 @@ spec:
 
 ### عبء الشبكة (Network Overhead)
 
-**YARN** يستخدم شبكة المضيف مباشرة (Host Networking) = أداء أعلى في الـ Shuffle.
+**YARN** يستخدم غالباً شبكة المضيف مباشرة = أداء جيد للـ Shuffle.
 
-**Kubernetes** يضيف طبقة CNI (Container Network Interface) = latency إضافي ~5-15%.
+**Kubernetes** يضيف CNI وطبقات عزل. مقدار الـ overhead يعتمد على الـ CNI، MTU، سياسة الشبكة، ونوع السحابة؛ لا تفترض رقماً ثابتاً بدون قياس.
 
-**الحل على K8s:**
-```bash
-spark-submit \
-  --conf spark.kubernetes.driver.pod.hostNetwork=true \
-  --conf spark.kubernetes.executor.pod.hostNetwork=true \
-  # يستخدم شبكة المضيف مباشرة - أداء أعلى لكن يحتاج صلاحيات أمان
-  ...
-```
+**الحلول على K8s:** استخدم CNI مناسباً للـ throughput، اضبط MTU، راقب network policies، وفكر في node locality أو remote shuffle service عند الـ shuffle الثقيل. Host networking يتطلب Pod templates/سياسات أمان واضحة ولا ينبغي تقديمه كإعداد افتراضي عام.
 
 ---
 

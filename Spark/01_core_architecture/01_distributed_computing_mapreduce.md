@@ -82,12 +82,12 @@ graph TD
 > [!WARNING]
 > **هذا هو الخلل الجوهري في MapReduce:**
 >
-> لا يمكن لأي Reducer أن يبدأ عمله حتى **تنتهي جميع الـ Mappers بدون استثناء**.
+> يستطيع الـ Reducer غالباً أن يبدأ نسخ مخرجات الـ Map قبل انتهاء كل الـ Mappers، لكن مرحلة الـ Reduce الفعلية لا تستطيع إنتاج النتيجة النهائية قبل اكتمال كل مخرجات الـ Map المطلوبة.
 >
 > ```
 > 100 Mapper انتهوا في دقيقتين
 > 1 Mapper (Straggler) يستغرق 45 دقيقة
-> → الـ Pipeline كلها تنتظر 45 دقيقة!
+> → النسخ قد يبدأ مبكراً، لكن النتيجة النهائية ستنتظر الـ Straggler
 > ```
 
 ### العيب الثاني: الاعتماد الكامل على القرص
@@ -133,7 +133,7 @@ graph TD
 
 ```mermaid
 graph LR
-    subgraph SPARK ["Spark DAG — الذاكرة أولاً"]
+    subgraph SPARK ["Spark DAG — Pipelining وتقليل I/O"]
         SInput[قراءة Parquet] --> Filter[Filter في الذاكرة]
         Filter --> PartAgg[Partial Aggregate في الذاكرة]
         PartAgg --> SW[Shuffle Write للقرص]
@@ -147,10 +147,10 @@ graph LR
 ```
 
 **ما الذي يحدث فيزيائياً؟**
-- القراءة من القرص: **مرة واحدة فقط** (في البداية)
-- Filter + Partial Aggregate: **في الذاكرة** بدون لمس القرص
-- Shuffle Write/Read: **مرة واحدة** (فقط عند الضرورة الحتمية)
-- الكتابة النهائية: **مرة واحدة** (في النهاية)
+- القراءة من المصدر تحدث عند تنفيذ Action، وقد تستفيد من Predicate Pushdown وColumn Pruning.
+- `Filter` و`Partial Aggregate` يمكن دمجهما داخل نفس الـ Stage، ولا يحتاجان تخزيناً وسيطاً مستقلاً.
+- الـ Shuffle يكتب ملفات محلية على أقراص الـ Executors، وقد يحدث Spill إذا لم تكفِ الذاكرة.
+- الكتابة النهائية تتم من الـ Executors إلى نظام التخزين، ولا تمر البيانات كلها عبر الـ Driver.
 
 ### مقارنة الحسابات
 
@@ -177,9 +177,10 @@ Spark:
 ```python
 # كل هذه العمليات تُنفَّذ في نفس الـ Task، في الذاكرة
 result = sc.textFile("s3://logs/") \
-           .filter(lambda line: "ERROR" in line) \   # Narrow ─┐
-           .map(lambda line: line.split("\t")[0]) \  # Narrow  ├── Task واحدة!
-           .map(lambda date: (date, 1))              # Narrow ─┘
+           .filter(lambda line: "ERROR" in line) \
+           .map(lambda line: line.split("\t")[0]) \
+           .map(lambda date: (date, 1))
+# كل العمليات السابقة Narrow ويمكن تنفيذها داخل نفس الـ Task لكل Partition.
 ```
 
 **ما يحدث:** سجل يدخل → يمر عبر الـ 3 عمليات في الذاكرة → يخرج. لا قرص، لا شبكة.
@@ -189,7 +190,7 @@ result = sc.textFile("s3://logs/") \
 ```python
 # هنا Spark مُجبر على نقل البيانات عبر الشبكة
 grouped = result.reduceByKey(lambda a, b: a + b)
-# كل البيانات ذات نفس الـ date يجب أن تجتمع في Executor واحد
+# كل البيانات ذات نفس الـ date يجب أن تجتمع في Reduce partition واحدة
 # → يتطلب نقل البيانات عبر الشبكة (Shuffle)!
 ```
 
@@ -236,7 +237,7 @@ df.explain(mode="formatted")
 | `HashAggregate (final)` | التجميع النهائي | بعد الـ Shuffle |
 
 > [!TIP]
-> **Pro Tip:** ابحث عن `PushedFilters` في خطتك. وجودها يعني أن Catalyst يقرأ فقط الصفوف المطلوبة من Parquet — توفير هائل في I/O!
+> **Pro Tip:** ابحث عن `PushedFilters` في خطتك. وجودها يعني أن Spark دفع شروط الفلترة لقارئ Parquet/ORC ليستفيد من إحصاءات Row Groups وPages وربما يقلل القراءة. هذا لا يعني دائماً أنه لن يقرأ إلا الصفوف المطابقة حرفياً.
 >
 > إذا لم تجدها، تأكد أنك لا تستخدم Python UDF قبل الفلتر (UDFs تُعطّل Pushdown).
 
@@ -262,7 +263,7 @@ df.select("*").filter("amount > 1000").join(lookup, "id").filter("region = 'MENA
 
 > [!TIP]
 > **Pro Tip — Whole-Stage Codegen:**
-> الـ `*` في الخطة (مثل `*(1) Filter`) يعني أن Spark **دمج العمليات في Java Class واحدة مُجمّعة**. البيانات تبقى في CPU Registers بدلاً من الذهاب للـ Heap — أسرع بـ 5-10x!
+> الـ `*` في الخطة (مثل `*(1) Filter`) يعني أن Spark دمج عدة Operators في Java code مولد ومترجم بواسطة JIT. هذا يقلل virtual calls وobject allocation، لكنه لا يعني أن كل البيانات تبقى دائماً داخل CPU Registers.
 
 ---
 
@@ -291,9 +292,9 @@ spark.sql.shuffle.partitions: 200 (الافتراضي)
 ```python
 # اضبط عدد الـ Partitions = حجم البيانات (بالـ MB) ÷ 128 MB
 # 2 TB = 2,048,000 MB ÷ 128 = ~16,000 Partition
-spark.conf.set("spark.sql.shuffle.partitions", "2000")
+spark.conf.set("spark.sql.shuffle.partitions", "16000")
 
-# أو الأسهل: فعّل AQE ليختار تلقائياً
+# أو فعّل AQE ليقلل Partitions الصغيرة بعد الـ Shuffle ويتعامل مع بعض حالات Skew
 spark.conf.set("spark.sql.adaptive.enabled", "true")
 ```
 
@@ -461,7 +462,7 @@ df.repartition(200, "key_column")  # ✅ Shuffle بناءً على Hash للمف
 spark.conf.set("spark.sql.shuffle.partitions", "200")  # افتراضي
 # الصيغة: حجم البيانات (MB) ÷ 128 MB = عدد الـ Partitions
 
-# 2. AQE (Spark 3+) — افعله دائماً
+# 2. AQE (Spark 3+) — فعّله غالباً، ثم اختبره مع Workload الحقيقي
 spark.conf.set("spark.sql.adaptive.enabled", "true")
 spark.conf.set("spark.sql.adaptive.skewJoin.enabled", "true")
 

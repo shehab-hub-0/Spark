@@ -38,11 +38,7 @@ final = result.collect()  # ← الآن فقط يعمل كل شيء!
 > [!TIP]
 > **Pro Tip:** يمكنك التحقق أن الكود "لا يعمل بعد" بوضع مسار غير موجود — Spark لن يُخطئ حتى تستدعي Action:
 >
-> ```python
-> df = spark.read.parquet("/path/does/not/exist")  # ← لا خطأ هنا!
-> df = df.filter("id > 100")                       # ← لا خطأ هنا!
-> df.count()  # ← هنا يظهر الخطأ: Path does not exist
-> ```
+> في كثير من مصادر البيانات قد لا يظهر خطأ المسار إلا عند الـ Action، لكن بعض القراءات قد تتحقق من الـ metadata أو schema مبكراً. الفكرة الصحيحة: التنفيذ الكامل للبيانات مؤجل، لا أن كل الأخطاء مؤجلة دائماً.
 
 ---
 
@@ -97,7 +93,7 @@ MEMORY_ONLY
   ← أعلى استهلاك للذاكرة (كائنات Java تأخذ ضعف حجمها الأصلي)
   ← إذا لم تكفِ الذاكرة: لا تخزين (يُعاد الحساب عند الطلب)
 
-MEMORY_AND_DISK (الافتراضي في cache())
+MEMORY_AND_DISK
   ← يخزن في الذاكرة أولاً
   ← إذا نفدت الذاكرة: يكتب على القرص
   ← آمن لكن القرص أبطأ
@@ -112,7 +108,7 @@ MEMORY_AND_DISK_SER
   ← الأكثر أماناً في الإنتاج
 
 OFF_HEAP
-  ← خارج الـ JVM Heap تماماً (Tungsten binary format)
+  ← خارج JVM Heap عند تفعيل off-heap memory
   ← لا GC overhead
   ← يتطلب تفعيل: spark.memory.offHeap.enabled=true
 ```
@@ -122,9 +118,9 @@ OFF_HEAP
 ```
 بيانات 10 GB (أصلية):
 
-MEMORY_ONLY:      ~20-25 GB في الـ JVM Heap (JVM Object overhead)
-MEMORY_ONLY_SER:  ~11-13 GB في الـ JVM Heap (Compressed bytes)
-OFF_HEAP:         ~10-11 GB خارج الـ JVM Heap (Tungsten binary)
+MEMORY_ONLY:      قد يكون أكبر بكثير بسبب JVM Object overhead
+MEMORY_ONLY_SER:  أقل مساحة غالباً مقابل كلفة serialization
+OFF_HEAP:         خارج الـ Heap لكنه يحتاج إعداداً ومراقبة دقيقة
 ```
 
 ---
@@ -229,7 +225,7 @@ for batch_id in range(100):
     df_clean = df.filter("is_valid = true").cache()
     df_clean.count()  # تجسيد
     
-    model.predict(df_clean).write.parquet(f"s3://output/batch_{batch_id}/")
+    model.transform(df_clean).write.parquet(f"s3://output/batch_{batch_id}/")
     # ⚠️ نسي unpersist! كل iteration تُضيف 5 GB للذاكرة
     # بعد 6 iterations: OOM!
 
@@ -239,7 +235,7 @@ for batch_id in range(100):
     df_clean = df.filter("is_valid = true").cache()
     df_clean.count()
     
-    model.predict(df_clean).write.parquet(f"s3://output/batch_{batch_id}/")
+    model.transform(df_clean).write.parquet(f"s3://output/batch_{batch_id}/")
     df_clean.unpersist()  # ✅ تنظيف فوري
 ```
 
@@ -380,7 +376,7 @@ print(rdd2.toDebugString().decode("utf-8")[:200])
 
 | المعيار | `cache()` | `persist(level)` | `checkpoint()` |
 | :--- | :--- | :--- | :--- |
-| الـ Default Level | `MEMORY_AND_DISK` | حسب ما تُحدد | - |
+| الـ Default Level | في PySpark DataFrame: `MEMORY_AND_DISK_DESER` في الإصدارات الحديثة؛ راجع إصدارك | حسب ما تُحدد | - |
 | يقطع الـ Lineage؟ | ❌ لا | ❌ لا | ✅ نعم |
 | مكان التخزين | Executor Memory/Disk | حسب المستوى | HDFS/S3 |
 | يبقى بعد إغلاق App؟ | ❌ لا | ❌ لا | ✅ نعم |

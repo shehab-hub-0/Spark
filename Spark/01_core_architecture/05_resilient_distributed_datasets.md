@@ -61,8 +61,8 @@ graph LR
 
 | نوع التبعية | مثال | يتطلب Shuffle؟ | التعافي عند فشل Partition |
 | :--- | :--- | :--- | :--- |
-| **Nar‌row (ضيق)** | `map`, `filter`, `flatMap` | ❌ لا | إعادة حساب الـ Partition المفقود فقط |
-| **Wide (واسع)** | `groupByKey`, `reduceByKey`, `join` | ✅ نعم | إعادة حساب جميع الـ Partitions الأب أيضاً |
+| **Narrow (ضيق)** | `map`, `filter`, `flatMap` | ❌ لا | غالباً إعادة حساب الـ Partition المفقود فقط |
+| **Wide (واسع)** | `groupByKey`, `reduceByKey`, `join` | ✅ نعم | قد يعاد تشغيل map-side stage إذا فقدت Shuffle outputs |
 
 > [!WARNING]
 > **Common Mistake:** استخدام `groupByKey()` بدلاً من `reduceByKey()`.
@@ -147,9 +147,10 @@ print(grouped.toDebugString().decode("utf-8"))
 ```python
 # هذه الثلاث عمليات ستُنفَّذ في مهمة واحدة، على نفس الـ Partition، في الذاكرة
 result = sc.textFile("s3://logs/") \
-           .filter(lambda line: "ERROR" in line) \  # Narrow ─┐
-           .map(lambda line: line.split(" ")[0]) \  # Narrow  ├── مهمة واحدة!
-           .map(lambda date: (date, 1))             # Narrow ─┘
+           .filter(lambda line: "ERROR" in line) \
+           .map(lambda line: line.split(" ")[0]) \
+           .map(lambda date: (date, 1))
+# هذه السلسلة Narrow ويمكن تنفيذها داخل نفس الـ Task لكل Partition.
 ```
 
 **ما يحدث فيزيائياً:**
@@ -168,9 +169,10 @@ Partition 0 يدخل المهمة:
 
 عدد الـ Partitions هو أحد أهم الإعدادات في Spark:
 
-### القاعدة الذهبية:
+### نقطة بداية عملية:
 ```
-عدد الـ Partitions = عدد الـ Cores الكلي × 2 إلى 4
+عدد الـ Partitions = عدد الـ Cores الكلي × 2 إلى 4 كبداية،
+ثم عدّل حسب حجم الـ Partition، الـ Spill، ومدة الـ Tasks في Spark UI.
 ```
 
 **مثال:**
@@ -221,10 +223,10 @@ grouped = kv_data.groupByKey()  # Wide Dependency
 ```
 
 > [!CAUTION]
-> **لهذا السبب تستخدم Checkpoint بعد كل Wide Dependency مُكلفة!**
+> لا تستخدم Checkpoint بعد كل Wide Dependency بشكل تلقائي؛ فهو يكتب إلى تخزين موثوق ويضيف I/O كبيراً. استخدمه عند وجود Lineage طويل، تكرارات ML، أو تكلفة تعافٍ عالية جداً.
 >
 > ```python
-> # قبل عملية Shuffle باهظة، خبّئ الـ RDD أو افعل Checkpoint
+> # قبل عملية Shuffle باهظة ومتكررة، خبّئ الـ RDD أو افعل Checkpoint حسب الهدف
 > important_rdd = kv_data.cache()  # أو .checkpoint()
 > grouped = important_rdd.groupByKey()
 > ```

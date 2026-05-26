@@ -50,7 +50,7 @@ result = df.groupBy("country").count().collect()
 > [!WARNING]
 > **خطأ شائع #2:** "مدير العنقود (Cluster Manager) يُشرف على تنفيذ المهام."
 >
-> **الحقيقة:** دوره ينتهي بعد تخصيص الموارد. بعدها يتحدث الـ Driver مباشرة مع الـ Executors عبر Peer-to-Peer بدون وسيط.
+> **الحقيقة:** مدير العنقود يخصص الموارد ويطلق الـ Executors ويراقب الحاويات/العمليات على مستوى المنصة. تنفيذ Spark Tasks نفسه ينسقه الـ Driver مباشرة مع الـ Executors عبر RPC، وليس مدير العنقود.
 
 ---
 
@@ -103,7 +103,7 @@ graph TD
 | **BlockManagerMaster** | يتتبع أين تُخزن البيانات المؤقتة (Cache) في العنقود | تفشل عمليات الـ Cache |
 
 > [!TIP]
-> **Pro Tip:** الـ Driver هو نقطة فشل واحدة (Single Point of Failure) بطبيعته. في بيئات الإنتاج، يجب تشغيله في وضع **Cluster Mode** (داخل العنقود) وليس **Client Mode** (على جهازك) حتى يستفيد من إعادة الجدولة التلقائية عند انهيار الجهاز.
+> **Pro Tip:** الـ Driver هو نقطة فشل حرجة. في الإنتاج يفضل تشغيله في **Cluster Mode** حتى يكون قريباً من الـ Executors وتديره منصة العنقود. إعادة تشغيل الـ Driver عند الفشل تعتمد على مدير الموارد وإعدادات المحاولة، وليست ضماناً عاماً في كل وضع.
 
 ---
 
@@ -123,9 +123,9 @@ graph TD
 |  └─────────────────────────────────────────────┘ |
 |                                                  |
 |  ┌────────────────┐  ┌─────────────────────────┐ |
-|  │  BlockManager  │  │     MemoryManager        │ |
-|  │ Cache Partitions│  │ Execution: 60% = 3.6 GB │ |
-|  │ Shuffle Files  │  │ Storage:   40% = 2.4 GB │ |
+|  │  BlockManager  │  │  UnifiedMemoryManager    │ |
+|  │ Cache Partitions│  │ Execution + Storage pool │ |
+|  │ Shuffle Files  │  │ Dynamic boundary         │ |
 |  └────────────────┘  └─────────────────────────┘ |
 +--------------------------------------------------+
 ```
@@ -133,7 +133,7 @@ graph TD
 **شرح الأقسام:**
 - **Task Thread Pool:** كل خيط (Thread) يعالج **Partition واحداً** في الوقت نفسه. عدد الخيوط = `spark.executor.cores`. إذا حددت 4 Cores، يعمل 4 خيوط بالتوازي.
 - **BlockManager:** يُخزن الـ Partitions المُخبأة (Cached) وملفات الـ Shuffle المحلية.
-- **MemoryManager:** يُقسم الذاكرة بين الأنشطة الحسابية (Execution: Joins, Aggregations) والتخزين المؤقت (Storage: Cache).
+- **MemoryManager:** يدير Unified Memory بين Execution memory للـ joins/sorts/aggregations وStorage memory للـ cache/broadcast. الحدود ديناميكية وليست 60/40 ثابتة في Spark الحديثة.
 
 ---
 
@@ -210,9 +210,11 @@ User Code → Unresolved Logical Plan → Analyzed Logical Plan
 spark-submit \
   --executor-cores 4 \
   --executor-memory 18g \
-  --num-executors 30 \  # لعنقود من 10 خوادم × 3 Executors
+  --num-executors 30 \
   my_app.py
 ```
+
+`--num-executors 30` هنا يعني عنقوداً من 10 خوادم × 3 Executors لكل خادم.
 
 > [!CAUTION]
 > **Common Mistake:** تخصيص 16 Cores لـ Executor واحد على خادم بـ 16 Core.
@@ -301,9 +303,9 @@ for i in range(100):
 
 | المقياس | القيمة الطبيعية | مؤشر الخطر | التشخيص |
 | :--- | :--- | :--- | :--- |
-| **GC Time** | < 5% من Task Time | > 15% | زيادة `executor.memory` أو تقليل `executor.cores` |
+| **GC Time** | < 5% من Task Time | > 15% | تقليل object allocation/UDFs، ضبط حجم Executor، أو تقليل `executor.cores` |
 | **Failed Tasks** | 0 | > 3 على نفس الـ Executor | مشكلة في الخادم المادي (قرص/شبكة) |
-| **Executor Status** | Active | Dead | OOM من نظام التشغيل؛ راجع `spark.executor.memoryOverhead` |
+| **Executor Status** | Active | Dead | OOM، timeout، فشل Node، أو قتل من مدير الموارد؛ راجع logs و`memoryOverhead` |
 | **Shuffle Spill (Disk)** | 0 | > حجم البيانات × 20% | زيادة `spark.sql.shuffle.partitions` |
 
 ---

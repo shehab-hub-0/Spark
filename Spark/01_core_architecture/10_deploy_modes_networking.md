@@ -2,7 +2,7 @@
 
 > [!IMPORTANT]
 > **هدف هذا الدليل:**
-> بنهاية هذا الملف، ستفهم لماذا يُسبب Client Mode كوارث في الإنتاج، كيف تُكوّن الـ Ports لتجاوز الـ Firewalls، ومتى تختار كل وضع بناءً على معمارية نظامك.
+> بنهاية هذا الملف، ستفهم متى يكون Client Mode مناسباً ومتى يصبح خطراً في الإنتاج، كيف تُكوّن الـ Ports لتجاوز الـ Firewalls، ومتى تختار كل وضع بناءً على معمارية نظامك.
 
 ---
 
@@ -55,7 +55,7 @@ graph TB
     Driver -->|"طلب موارد"| CM
 ```
 
-**المشاكل الحتمية في Client Mode مع بيئة الإنتاج:**
+**المخاطر الشائعة في Client Mode مع بيئة الإنتاج:**
 
 | المشكلة | السبب | التأثير |
 | :--- | :--- | :--- |
@@ -101,7 +101,7 @@ graph TB
 | **لا انقطاع** | حتى لو أُغلق جهازك، الـ Job يستمر |
 | **شبكة سريعة** | Driver-Executor على 10Gbps بدلاً من 1Gbps |
 | **لا تعارض موارد** | Airflow Worker لا يحمل أي Driver JVM |
-| **إعادة تشغيل تلقائية** | Cluster Manager يُعيد Driver عند انهياره |
+| **إدارة منصة أفضل** | يمكن لمدير الموارد إعادة المحاولة حسب الإعدادات، لكن ذلك ليس ضماناً مطلقاً |
 
 ---
 
@@ -115,7 +115,7 @@ graph TB
 2. الـ Driver ينطلق على جهازك
 3. الـ Executors داخل العنقود تحاول الاتصال بجهازك على:
    - spark.driver.port (افتراضي: عشوائي!)
-   - spark.blockManager.port (افتراضي: عشوائي!)
+   - spark.driver.blockManager.port (افتراضي: يرث `spark.blockManager.port` إذا لم يحدد)
 4. الـ Firewall على جهازك يحظر الاتصالات الواردة!
 5. الـ Executors تنتهي مهلتها (Connection Timeout)
 6. الـ Job يفشل بـ: "Executor timeout"
@@ -134,12 +134,14 @@ ERROR TransportClientFactory: Failed to create new connection
 spark-submit \
   --master yarn \
   --deploy-mode client \
-  --conf spark.driver.host=192.168.1.100 \      # عنوان IP جهازك الصريح
-  --conf spark.driver.port=40000 \              # منفذ ثابت (لا عشوائي)
-  --conf spark.blockManager.port=40001 \        # منفذ ثابت
-  --conf spark.driver.bindAddress=0.0.0.0 \     # استمع على كل الـ Interfaces
+  --conf spark.driver.host=192.168.1.100 \
+  --conf spark.driver.port=40000 \
+  --conf spark.driver.blockManager.port=40001 \
+  --conf spark.driver.bindAddress=0.0.0.0 \
   my_app.py
 ```
+
+الإعدادات السابقة تثبت عنوان الـ Driver ومنافذ الـ RPC والـ BlockManager، وتجعله يستمع على كل الـ Interfaces.
 
 ```bash
 # فتح الـ Firewall (على Ubuntu/Debian)
@@ -169,18 +171,15 @@ sudo ufw allow from [subnet_العنقود] to any port 40001
 
 ## 5. 📊 مقارنة أداء الشبكة: أرقام حقيقية
 
-**سيناريو:** معالجة 50 GB من البيانات مع `collect()` في النهاية
+**سيناريو توضيحي:** معالجة 50 GB من البيانات مع `collect()` في النهاية
 
 ```
-Client Mode (Driver على Gateway بـ 1Gbps):
-  وقت الـ Shuffle (داخلي):     ~8 دقائق (شبكة العنقود 10Gbps)
-  وقت الـ Collect (خارجي):    ~7 دقائق (50 GB على شبكة 1Gbps)
-  إجمالي:                      ~15 دقيقة
+Client Mode:
+  نتائج collect تنتقل من Executors إلى Driver على جهاز الإرسال.
+  إذا كانت الشبكة أبطأ أو بعيدة عن العنقود، يصبح Driver bottleneck.
 
-Cluster Mode (Driver داخل العنقود):
-  وقت الـ Shuffle (داخلي):     ~8 دقائق (شبكة العنقود 10Gbps)
-  وقت الـ Collect (داخلي):     ~1 دقيقة (50 GB على 10Gbps)
-  إجمالي:                      ~9 دقيقة (أسرع بـ 40%!)
+Cluster Mode:
+  Driver داخل العنقود، لكن collect الكبير ما زال خطأً لأنه يضغط Driver memory.
 
 الفرق الحقيقي: لا تُعيد البيانات للـ Driver! اكتب مباشرة للـ Storage:
 df.write.parquet("s3://output/")   ← هذا هو الصحيح دائماً
@@ -350,7 +349,7 @@ netstat -tlnp | grep 4[50]0[0-9][0-9]
 ```bash
 spark-submit \
   --conf spark.driver.port=40000 \
-  --conf spark.blockManager.port=40001 \
+  --conf spark.driver.blockManager.port=40001 \
   --conf spark.port.maxRetries=5 \
   ...
 ```
@@ -365,7 +364,7 @@ spark-submit \
 spark-submit \
   # وضع النشر
   --master yarn|k8s://...|spark://...:7077 \
-  --deploy-mode client|cluster \             # ← القرار الحاسم
+  --deploy-mode client|cluster \
   
   # موارد الـ Driver (مهم في Client Mode)
   --driver-memory 4g \
@@ -379,7 +378,7 @@ spark-submit \
   # منافذ ثابتة (لـ Client Mode خلف Firewall)
   --conf spark.driver.host=192.168.1.100 \
   --conf spark.driver.port=40000 \
-  --conf spark.blockManager.port=40001 \
+  --conf spark.driver.blockManager.port=40001 \
   
   my_app.py
 ```

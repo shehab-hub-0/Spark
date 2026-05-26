@@ -10,7 +10,7 @@
 
 عندما تكتب:
 ```python
-result = df.read.parquet("...") \
+result = spark.read.parquet("...") \
            .filter("amount > 500") \
            .groupBy("city") \
            .agg({"sales": "sum"}) \
@@ -131,7 +131,7 @@ Task 0 (على Executor 1) تُعالج Partition 0:
 Task 0 في Stage 1 تُريد city="Cairo" فقط:
   1. تسأل الـ Driver: "أين partition_for_reducer_0 من Stage 0؟"
   2. الـ Driver يُعيد: "في Executor 1 وExecutor 3 وExecutor 5"
-  3. Task 0 تسحب الملفات من الـ Executors الثلاثة عبر HTTP
+  3. Task 0 تسحب Shuffle blocks من الـ Executors عبر Netty-based BlockTransferService
   4. تدمج البيانات وتُجري الـ Aggregation
 ```
 
@@ -242,7 +242,7 @@ Job: FAILED
 | :--- | :--- | :--- |
 | **FetchFailedException** | ملفات الـ Shuffle تالفة أو مفقودة | الـ Executor مات أثناء الـ Shuffle Write؛ Spark يُعيد Stage 0 |
 | **OutOfMemoryError** | Task تحاول تحميل Partition أكبر من الذاكرة | زيادة `spark.sql.shuffle.partitions` |
-| **Task timeout** | Task تستغرق أطول من `spark.task.maxFailures` | مشكلة في الشبكة أو Data Skew |
+| **Task timeout** | Task لا ترسل تقدم/heartbeat أو تتعطل | مشكلة شبكة، GC طويل، OOM قريب، أو Data Skew |
 
 ---
 
@@ -295,7 +295,8 @@ skewed_data = spark.createDataFrame(
     [(i % 3, float(i)) for i in range(500000)],
     ["key", "value"]
 )
-# key=0 سيحتوي على 167K سجل، key=1: 167K، key=2: 166K
+# هذا المثال لا يصنع Skew حقيقياً؛ المفاتيح الثلاثة شبه متوازنة.
+# لصناعة Skew، اجعل معظم الصفوف على مفتاح واحد.
 
 # بدون AQE
 spark.conf.set("spark.sql.adaptive.enabled", "false")

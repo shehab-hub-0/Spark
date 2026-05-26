@@ -104,12 +104,13 @@ print(spark2.conf.get("spark.app.name"))  # "App1" وليس "App2"!
 
 تُقرأ الإعدادات بهذا الترتيب (الأحدث يتغلب على القديم):
 ```
-1. القيم الافتراضية في Spark (spark-defaults.conf)
-2. متغيرات البيئة (SPARK_EXECUTOR_MEMORY=4g)
-3. ملف spark-defaults.conf في المجلد conf/
-4. الإعدادات في spark-submit (--conf key=value)
-5. الإعدادات في الكود (.config("key", "value"))  ← الأعلى أولوية
+1. القيم الافتراضية داخل Spark
+2. ملفات الإعداد مثل `spark-defaults.conf`
+3. معاملات `spark-submit` مثل `--conf key=value`
+4. إعدادات `SparkConf` أو `.config(...)` قبل إنشاء `SparkContext`
 ```
+
+> بعض الإعدادات لا يمكن تغييرها بعد إنشاء `SparkContext`، حتى لو استخدمت `spark.conf.set` لاحقاً.
 
 **المرحلة 3 — SparkEnv: البنية التحتية الداخلية:**
 
@@ -124,17 +125,7 @@ SparkEnv يحتوي على:
 
 > [!TIP]
 > **Pro Tip:** يمكنك إضافة Listeners مخصصة لالتقاط أحداث Spark برمجياً (مثل إرسال تنبيه عند فشل Stage):
-> ```python
-> from pyspark import SparkContext
-> 
-> class MyListener(object):
->     def onJobEnd(self, jobEnd):
->         if jobEnd.jobResult().getClass().getSimpleName() == "JobFailed":
->             send_alert("Job failed!")
-> 
-> sc = spark.sparkContext
-> sc._jsc.sc().addSparkListener(sc._jvm.MyListener())
-> ```
+> إضافة SparkListeners مخصصة من PySpark ليست مباشرة مثل تعريف Python class وتمريرها للـ JVM. في الإنتاج استخدم JVM listener مضافاً عبر `spark.extraListeners`، أو اعتمد على event logs وSpark History Server/metrics sinks.
 
 ---
 
@@ -151,12 +142,12 @@ spark = SparkSession.builder \
     # --- إعدادات الموارد ---
     .config("spark.executor.memory", "8g") \
     .config("spark.executor.cores", "4") \
-    .config("spark.executor.memoryOverhead", "1g") \   # لـ Python workers
+    .config("spark.executor.memoryOverhead", "1g") \
     .config("spark.driver.memory", "4g") \
     
     # --- إعدادات الأداء ---
-    .config("spark.sql.shuffle.partitions", "200") \   # اضبطها = 2×عدد Cores الكلي
-    .config("spark.sql.adaptive.enabled", "true") \    # تفعيل AQE (Spark 3+)
+    .config("spark.sql.shuffle.partitions", "200") \
+    .config("spark.sql.adaptive.enabled", "true") \
     .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
     
     # --- إعدادات الـ Catalog (Hive) ---
@@ -431,8 +422,8 @@ def fast_udf(series: pd.Series) -> pd.Series:
 # إنشاء Session مثالية للإنتاج
 spark = SparkSession.builder \
     .appName("ProductionJob") \
-    .config("spark.sql.adaptive.enabled", "true") \      # AQE تلقائي
-    .config("spark.sql.shuffle.partitions", "auto") \    # AQE يختار تلقائياً
+    .config("spark.sql.adaptive.enabled", "true") \
+    .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
     .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
     .getOrCreate()
 

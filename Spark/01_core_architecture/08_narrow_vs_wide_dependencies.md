@@ -11,7 +11,7 @@
 هذا هو **السؤال الأهم** الذي يجب أن تسأله عن كل عملية تكتبها في Spark.
 
 **التبعية الضيقة (Narrow Dependency):** كل Partition في الـ RDD الابن يعتمد على Partition واحد فقط من الأب.
-→ **لا شبكة، لا قرص، لا تأخير.**
+→ لا تحتاج Shuffle. قد تقرأ من التخزين أو تكتب ناتجاً نهائياً، لكنها لا تحتاج إعادة توزيع عبر الشبكة بين Partitions.
 
 **التبعية الواسعة (Wide Dependency):** كل Partition في الابن يحتاج بيانات من عدة Partitions في الأب.
 → **Shuffle حتمي: كتابة على قرص + نقل عبر شبكة + قراءة من قرص.**
@@ -77,7 +77,7 @@ graph LR
 الخطوة 3 — Shuffle Read (Reduce Side):
   كل Task تسأل Driver: "أين الملف الخاص بـ Partition 3؟"
   Driver يُجيب بعناوين الـ Executors
-  Task تسحب الملفات عبر HTTP
+  Task تسحب Shuffle blocks عبر خدمة نقل Spark الداخلية
 ```
 
 ---
@@ -203,7 +203,8 @@ result = large_df.join(medium_df, "key").repartition(200)
 # ✅ إذا كنت تحتاج توزيعاً معيناً، وزّع قبل الـ Join
 large_repartitioned = large_df.repartition(200, "key")
 medium_repartitioned = medium_df.repartition(200, "key")
-# الآن الـ Join سيكون Narrow لأن نفس المفاتيح في نفس الـ Partitions!
+# قد يستفيد Spark من التوزيع، لكن DataFrame optimizer قد يضيف Exchange إذا لم يثبت له نفس partitioning.
+# تحقق دائماً من explain() ولا تفترض أن الـ Join أصبح Narrow.
 result = large_repartitioned.join(medium_repartitioned, "key")
 ```
 
@@ -213,13 +214,13 @@ result = large_repartitioned.join(medium_repartitioned, "key")
 # ❌ orderBy في منتصف Pipeline
 df.groupBy("city") \
   .sum("amount") \
-  .orderBy("city") \   # ← Shuffle عالمي (Global Sort) هنا!
+  .orderBy("city") \
   .filter("sum(amount) > 1000")  # ← الفلتر يأتي بعد Shuffle!
 
 # ✅ الفلتر أولاً ثم الترتيب
 df.groupBy("city") \
   .sum("amount") \
-  .filter("sum(amount) > 1000") \  # قلل البيانات أولاً
+  .filter("sum(amount) > 1000") \
   .orderBy("city")                 # ثم رتب ما تبقى
 ```
 
@@ -278,10 +279,11 @@ print(f"تكلفة الـ Shuffle: {wide_time/narrow_time:.1f}x أبطأ")
 ### التمرين 3: اختبار Broadcast Join
 
 ```python
+from pyspark.sql import SparkSession
 from pyspark.sql.functions import broadcast
 import time
 
-spark_sql = spark.builder.master("local[4]").appName("BroadcastTest").getOrCreate()
+spark_sql = SparkSession.builder.master("local[4]").appName("BroadcastTest").getOrCreate()
 
 # بيانات كبيرة
 large = spark_sql.range(1, 5_000_000) \

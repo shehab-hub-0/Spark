@@ -106,7 +106,7 @@ Spark لا ينفذ كل خطوة فوراً. هو يبني **DAG**: رسم بي
   -> Write
 ```
 
-العمليات الضيقة مثل `filter` و`map` يمكن دمجها في Task واحدة، داخل الذاكرة، بدون قرص أو شبكة. Spark يكتب على القرص غالباً عند الـ Shuffle أو عند الكتابة النهائية.
+العمليات الضيقة مثل `filter` و`map` يمكن دمجها في Task واحدة، داخل الذاكرة، بدون Shuffle. Spark يكتب على القرص غالباً عند الـ Shuffle أو الـ Spill أو عند الكتابة النهائية.
 
 ### مثال كود وشرحه
 
@@ -968,7 +968,7 @@ spark-submit \
   --deploy-mode client \
   --conf spark.driver.host=192.168.1.100 \
   --conf spark.driver.port=40000 \
-  --conf spark.blockManager.port=40001 \
+  --conf spark.driver.blockManager.port=40001 \
   my_app.py
 ```
 
@@ -976,7 +976,7 @@ spark-submit \
 
 - `spark.driver.host`: العنوان الذي يعلنه الـ Driver للـ Executors.
 - `spark.driver.port`: منفذ RPC الرئيسي.
-- `spark.blockManager.port`: منفذ تبادل blocks.
+- `spark.driver.blockManager.port`: منفذ Driver BlockManager في Client Mode. إذا لم يحدد، يرث غالباً `spark.blockManager.port`.
 - يجب فتح هذه المنافذ من شبكة العنقود إلى جهاز الـ Driver.
 
 ### لا تستخدم collect للإخراج الكبير
@@ -1174,7 +1174,9 @@ expensive = spark.range(1, 10_000_000) \
 
 expensive.cache()
 expensive.count()
-expensive.groupByExpr("id % 10").count().show()
+from pyspark.sql.functions import expr
+
+expensive.groupBy(expr("id % 10")).count().show()
 expensive.unpersist()
 ```
 
@@ -1228,4 +1230,3 @@ User Code
 1. اقرأ `explain()` قبل تحسين الأداء.
 2. راقب Spark UI بعد التنفيذ.
 3. قلل البيانات قبل أي `join`, `groupBy`, أو `orderBy`.
-
