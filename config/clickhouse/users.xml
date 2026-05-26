@@ -1,0 +1,88 @@
+<clickhouse>
+  <profiles>
+    <default>
+      <!-- Max memory per query: 1.5GB -->
+      <max_memory_usage>1500000000</max_memory_usage>
+      <!-- Spill to disk for sort/group operations when memory is tight -->
+      <max_bytes_before_external_sort>500000000</max_bytes_before_external_sort>
+      <max_bytes_before_external_group_by>500000000</max_bytes_before_external_group_by>
+      <!-- Allow less accurate aggregations under memory pressure -->
+      <max_memory_usage_for_all_queries>1800000000</max_memory_usage_for_all_queries>
+    </default>
+
+    <!-- Read-only profile for BI tools (Superset, Dremio) -->
+    <readonly>
+      <readonly>1</readonly>
+      <max_memory_usage>500000000</max_memory_usage>
+      <max_execution_time>120</max_execution_time>
+    </readonly>
+  </profiles>
+
+  <users>
+    <!-- Admin user — full access, restricted to Docker internal network -->
+    <admin>
+      <password_sha256_hex>8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918</password_sha256_hex>
+      <!-- SHA256 of "admin" — CHANGE IN PRODUCTION -->
+      <networks>
+        <ip>172.29.0.0/16</ip>     <!-- Docker bridge network only -->
+        <ip>::1</ip>                <!-- localhost IPv6 -->
+        <ip>127.0.0.1</ip>         <!-- localhost IPv4 -->
+      </networks>
+      <profile>default</profile>
+      <quota>default</quota>
+      <access_management>1</access_management>
+    </admin>
+
+    <!-- Spark service account — write access for Gold Layer ETL -->
+    <spark_etl>
+      <password_sha256_hex>a31ab3e5cc2ba73b8a04f8bab0a8cc6b13b1f11f7bd2c42d2dc2c0e2b5fa5c3a</password_sha256_hex>
+      <!-- SHA256 of "spark_etl_secure" — CHANGE IN PRODUCTION -->
+      <networks>
+        <ip>172.29.0.0/16</ip>     <!-- Docker internal only -->
+      </networks>
+      <profile>default</profile>
+      <quota>default</quota>
+      <allow_databases>
+        <database>gold</database>
+        <database>default</database>
+      </allow_databases>
+    </spark_etl>
+
+    <!-- Read-only BI user for Superset/Dremio -->
+    <bi_reader>
+      <password_sha256_hex>e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</password_sha256_hex>
+      <!-- SHA256 of "" (empty) — SET A REAL PASSWORD IN PRODUCTION -->
+      <networks>
+        <ip>172.29.0.0/16</ip>
+      </networks>
+      <profile>readonly</profile>
+      <quota>default</quota>
+      <allow_databases>
+        <database>gold</database>
+      </allow_databases>
+    </bi_reader>
+
+    <!-- Default user — disabled for security (no open access) -->
+    <default>
+      <password>DISABLED_USE_NAMED_USERS</password>
+      <networks>
+        <ip>127.0.0.1</ip>
+      </networks>
+      <profile>default</profile>
+      <quota>default</quota>
+    </default>
+  </users>
+
+  <quotas>
+    <default>
+      <interval>
+        <duration>3600</duration>
+        <queries>0</queries>
+        <errors>0</errors>
+        <result_rows>0</result_rows>
+        <read_rows>0</read_rows>
+        <execution_time>0</execution_time>
+      </interval>
+    </default>
+  </quotas>
+</clickhouse>

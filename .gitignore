@@ -1,0 +1,57 @@
+# ================================================================
+# .gitignore — Smart City Data Platform
+# ================================================================
+
+# ── Secrets & Environment ────────────────────────────────────────
+.env
+.env.local
+.env.production
+
+# ── Python ───────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# ── IDE ──────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── Docker ───────────────────────────────────────────────────────
+# Don't ignore docker-compose.yml itself — it's config, not secrets
+# Ignore runtime data
+logs/
+*.log
+
+# ── Airflow ──────────────────────────────────────────────────────
+airflow-webserver.pid
+
+# ── Data (generated / large) ─────────────────────────────────────
+data/*.json
+data/*.csv
+data/*.parquet
+*.parquet
+*.avro
+
+# ── Spark ────────────────────────────────────────────────────────
+spark-warehouse/
+metastore_db/
+derby.log
+
+# ── OS ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── Kafka Connect plugins (downloaded at runtime) ────────────────
+connectors/

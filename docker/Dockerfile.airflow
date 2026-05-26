@@ -1,0 +1,22 @@
+FROM apache/airflow:3.2.1-python3.12
+
+USER root
+
+# Install Java (required for SparkSubmitOperator to find spark-submit)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-17-jre-headless procps curl && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+
+USER airflow
+
+# Install Airflow 3.x compatible providers + PySpark
+# Provider versions are auto-resolved by pip against Airflow 3.0 constraints
+RUN pip install --no-cache-dir --timeout 300 --retries 10 \
+    apache-airflow-providers-apache-spark \
+    apache-airflow-providers-postgres \
+    pyspark==3.5.0 \
+    great-expectations \
+    clickhouse-connect \
+    boto3 s3fs pandas pyarrow

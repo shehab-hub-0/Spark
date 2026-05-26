@@ -1,0 +1,28 @@
+# ================================================================
+# Traefik Static Configuration
+# ================================================================
+
+# Enable API and Dashboard (dev only — add auth in production)
+api:
+  dashboard: true
+  insecure: true
+
+# Entry points
+entryPoints:
+  web:
+    address: ":80"
+
+# Docker provider — auto-discovers services via container labels
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: data-platform-net
+    watch: true
+
+# Logging
+log:
+  level: INFO
+
+# Access logs
+accessLog: {}

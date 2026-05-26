@@ -1,0 +1,48 @@
+FROM jupyter/pyspark-notebook:spark-3.5.0
+
+USER root
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    curl wget procps ca-certificates gcc python3-dev libpq-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# Download JARs individually for reliable layer caching
+WORKDIR /usr/local/spark/jars
+
+# Kafka integration
+RUN wget -q https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.12/3.5.0/spark-sql-kafka-0-10_2.12-3.5.0.jar
+RUN wget -q https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.4.1/kafka-clients-3.4.1.jar
+RUN wget -q https://repo1.maven.org/maven2/org/apache/spark/spark-token-provider-kafka-0-10_2.12/3.5.0/spark-token-provider-kafka-0-10_2.12-3.5.0.jar
+RUN wget -q https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.11.1/commons-pool2-2.11.1.jar
+
+# PostgreSQL JDBC
+RUN wget -q https://repo1.maven.org/maven2/org/postgresql/postgresql/42.6.0/postgresql-42.6.0.jar
+
+# S3A / MinIO (Hadoop AWS)
+RUN wget -q https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar
+RUN wget -q https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar
+
+# Apache Iceberg
+RUN wget -q https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.5.0/iceberg-spark-runtime-3.5_2.12-1.5.0.jar
+
+# Project Nessie
+RUN wget -q https://repo1.maven.org/maven2/org/projectnessie/nessie-integrations/nessie-spark-extensions-3.5_2.12/0.77.1/nessie-spark-extensions-3.5_2.12-0.77.1.jar
+
+# ClickHouse — JDBC driver (all-in-one) + Spark Connector (Data Warehouse)
+RUN wget -q https://repo1.maven.org/maven2/com/clickhouse/clickhouse-jdbc/0.6.5/clickhouse-jdbc-0.6.5-http.jar
+RUN wget -q https://repo1.maven.org/maven2/com/clickhouse/spark/clickhouse-spark-runtime-3.5_2.12/0.8.1/clickhouse-spark-runtime-3.5_2.12-0.8.1.jar
+
+# Set permissions
+RUN chmod -R 777 /usr/local/spark/jars
+
+# Set WORKDIR back to home for Jupyter
+WORKDIR /home/jovyan
+
+USER jovyan
+
+# Install additional Python libraries (including pyspark so default site-packages has it, avoiding findspark)
+RUN pip install --no-cache-dir --default-timeout=1000 \
+    kafka-python psycopg2-binary sqlalchemy boto3 findspark minio \
+    great-expectations clickhouse-connect
