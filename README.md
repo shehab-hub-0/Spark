@@ -25,6 +25,21 @@
 
 ---
 
+## 📦 الحصول على المشروع وتحديثه (Clone & Pull)
+
+للحصول على نسخة من المعمل وكل الأكواد، استخدم الأمر التالي:
+```bash
+git clone https://github.com/shehab-hub-0/Spark.git
+cd Spark
+```
+
+عشان تحدث المعمل وتجيب آخر التغييرات اللي بتنزل عليه (زي النوت بوكس أو الإعدادات الجديدة)، افتح الـ Terminal جوة مجلد المشروع واكتب:
+```bash
+git pull origin main
+```
+
+---
+
 ## 🚀 طريقة التشغيل (Getting Started)
 
 عشان تشغل المعمل على جهازك، اتبع الخطوات دي:
@@ -60,12 +75,15 @@ docker compose up -d postgres minio spark-master spark-worker-1 spark-worker-2 j
 
 بعد ما المعمل يشتغل بنجاح، افتح المتصفح بتاعك وادخل على الروابط دي:
 
-| الأداة (Service) | الرابط (URL) | الباسورد (لو طلب) |
+| الأداة (Service) | الرابط (URL) | الباسورد / المستخدم |
 |---|---|---|
 | **Jupyter Lab** (كتابة الكود) | [http://localhost:8889](http://localhost:8889) | `admin` |
-| **Spark Master UI** (مراقبة العمال) | [http://localhost:8085](http://localhost:8085) | - |
+| **Spark Master UI** (مراقبة المهام) | [http://localhost:8085](http://localhost:8085) | - |
+| **Spark Worker 1** (العامل الأول) | [http://localhost:8092](http://localhost:8092) | - |
+| **Spark Worker 2** (العامل الثاني) | [http://localhost:8093](http://localhost:8093) | - |
 | **Spark History** (مراجعة المهام) | [http://localhost:18080](http://localhost:18080) | - |
-| **MinIO Console** (رفع الداتا) | [http://localhost:9008](http://localhost:9008) | `admin` / `admin123` |
+| **MinIO Console** (رفع الداتا) | [http://localhost:9008](http://localhost:9008) | `minioadmin` / `minioadmin` |
+| **PostgreSQL** (قاعدة البيانات) | `localhost:5432` | `postgres` / `postgres` |
 | **Dremio** | [http://localhost:9047](http://localhost:9047) | - |
 | **Nessie Catalog** | [http://localhost:19120](http://localhost:19120) | - |
 
@@ -80,6 +98,24 @@ docker compose up -d postgres minio spark-master spark-worker-1 spark-worker-2 j
 - 📂 `data/` ⬅️ حط هنا أي ملفات CSV أو JSON عايز تقراها بالـ Spark (مربوط بـ `/data` جوة Jupyter).
 
 > **💡 نصيحة:** المجلدات `notebooks/` و `scripts/` محمية ومش هتترفع على Git عشان تحافظ على حلك للتمارين خاص بيك.
+
+---
+
+## 🔗 تفاصيل الاتصال والإعدادات (Connectors)
+
+جوة مجلد `connectors/` هتلاقي ملفات مهمة بتساعدك في إعداد بيئة العمل والاتصال بالأدوات المختلفة:
+
+### 1. إعدادات VS Code (`connectors/spark_env.txt`)
+الملف ده بيشرح إزاي تربط محرّر VS Code بتاعك مباشرة بالـ Jupyter Server اللي شغال جوة Docker عشان تقدر تكتب كود PySpark وتنفذه مباشرة في VS Code بدل المتصفح.
+- **نوع الخادم:** Existing Jupyter Server
+- **الرابط:** `http://127.0.0.1:8889/?token=admin`
+- **بيئة التشغيل (Kernel):** Python 3 (ipykernel)
+
+### 2. الاتصال وتجهيز الداتا (`connectors/ConnS.ipynb`)
+النوت بوك ده بيحتوي على أكواد بايثون مساعدة بتعمل الآتي:
+- **إعداد MinIO:** إنشاء الـ Buckets الأساسية زي `warehouse` و `spark-logs` وتجهيز مسار لـ Spark History.
+- **ربط Dremio بـ Nessie:** كود بيعمل اتصال أوتوماتيكي بين Dremio و Nessie عبر الـ API الخاص بـ Dremio.
+- **تنظيف البيانات (Clear Data):** بيحتوي على سكريبت لمسح الداتا من MinIO وجداول ClickHouse وتصفير Nessie Catalog لو احتجت تبدأ على نظافة (Clean Slate).
 
 ---
 
