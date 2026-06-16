@@ -78,7 +78,7 @@ if [[ "$choice" == "spark" ]]; then
     fi
 
     echo -e "\n${BLUE}⚙️ Step 2: Starting the Spark stack...${NC}"
-    docker compose up -d $BUILD_FLAG core-postgres storage-minio compute-spark-master compute-spark-worker-1 compute-spark-worker-2 ide-jupyter-workspace compute-spark-history meta-nessie query-dremio dw-clickhouse || {
+    docker compose up -d $BUILD_FLAG postgres minio spark-master spark-worker-1 spark-worker-2 jupyter-workspace spark-history nessie dremio clickhouse || {
         echo -e "${RED}❌ Failed to start the Spark platform via docker compose.${NC}"
         exit 1
     }

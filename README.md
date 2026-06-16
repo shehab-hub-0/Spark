@@ -15,13 +15,13 @@
 
 المعمل بيحتوي على مجموعة من الخدمات (Services) المترابطة عشان تحاكي بيئة العمل الحقيقية في الشركات:
 
-1. **Jupyter Workspace (`ide-jupyter-workspace`)**: بيئة كتابة الأكواد الرئيسية (IDE). هنا هتفتح الـ Notebooks وتكتب كود PySpark بتاعك.
-2. **Spark Cluster (`compute-spark-master` & `compute-spark-worker-1/2`)**: المحرك الرئيسي لمعالجة البيانات. متكون من مدير (Master) وعاملين (Workers) عشان ينفذوا الكود بتاعك بشكل موزع (Distributed).
-3. **Spark History Server (`compute-spark-history`)**: واجهة بتسمحلك تراجع وتحلل الـ Jobs اللي خلصت وتفهم إزاي الـ Spark نفذها خطوة بخطوة.
-4. **MinIO (`storage-minio`)**: بيمثل الـ **Data Lake** بتاعك. هو نظام تخزين متوافق مع S3، هترفع عليه الملفات الخام (Raw Data) عشان الـ Spark يقراها.
-5. **PostgreSQL (`core-postgres`)**: قاعدة بيانات علائقية تُستخدم كخلفية لحفظ البيانات الوصفية (Metadata) للمعمل.
-6. **Project Nessie (`meta-nessie`) & Dremio (`query-dremio`)**: أدوات بناء الـ **Data Lakehouse** الحديثة لتنظيم وإدارة البيانات.
-7. **ClickHouse (`dw-clickhouse`)**: بيمثل الـ **Data Warehouse**. قاعدة بيانات تحليلية سريعة جداً ممكن تستخدمها عشان تخزن النتايج النهائية بعد معالجتها بالـ Spark.
+1. **Jupyter Workspace (`jupyter-workspace`)**: بيئة كتابة الأكواد الرئيسية (IDE). هنا هتفتح الـ Notebooks وتكتب كود PySpark بتاعك.
+2. **Spark Cluster (`spark-master` & `spark-worker-1/2`)**: المحرك الرئيسي لمعالجة البيانات. متكون من مدير (Master) وعاملين (Workers) عشان ينفذوا الكود بتاعك بشكل موزع (Distributed).
+3. **Spark History Server (`spark-history`)**: واجهة بتسمحلك تراجع وتحلل الـ Jobs اللي خلصت وتفهم إزاي الـ Spark نفذها خطوة بخطوة.
+4. **MinIO (`minio`)**: بيمثل الـ **Data Lake** بتاعك. هو نظام تخزين متوافق مع S3، هترفع عليه الملفات الخام (Raw Data) عشان الـ Spark يقراها.
+5. **PostgreSQL (`postgres`)**: قاعدة بيانات علائقية تُستخدم كخلفية لحفظ البيانات الوصفية (Metadata) للمعمل.
+6. **Project Nessie (`nessie`) & Dremio (`dremio`)**: أدوات بناء الـ **Data Lakehouse** الحديثة لتنظيم وإدارة البيانات.
+7. **ClickHouse (`clickhouse`)**: بيمثل الـ **Data Warehouse**. قاعدة بيانات تحليلية سريعة جداً ممكن تستخدمها عشان تخزن النتايج النهائية بعد معالجتها بالـ Spark.
 
 ---
 
@@ -40,6 +40,11 @@ cp .env.example .env
 شغل السكريبت المساعد:
 ```bash
 ./build_and_push.sh
+```
+
+**أو يمكنك استخدام الأمر المباشر لتشغيل خدمات Spark والـ Data Lakehouse فقط:**
+```bash
+docker compose up -d postgres minio spark-master spark-worker-1 spark-worker-2 jupyter-workspace spark-history nessie dremio clickhouse
 ```
 
 **السكريبت هيسألك سؤالين:**

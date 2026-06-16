@@ -25,13 +25,13 @@ x-airflow-common: &airflow-common
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@core-postgres/airflow
-    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://airflow:airflow@core-postgres/airflow
-    AIRFLOW__CELERY__BROKER_URL: redis://:@core-redis:6379/0
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
     AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
-    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://orch-airflow-web:8080/execution/'
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-web:8080/execution/'
     AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW__API_AUTH__JWT_SECRET:-airflow_jwt_secret}
     AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW__API_AUTH__JWT_ISSUER:-airflow}
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
@@ -49,9 +49,9 @@ x-airflow-common: &airflow-common
     - ./data:/opt/airflow/data
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on: &airflow-common-depends-on
-    core-redis:
+    redis:
       condition: service_healthy
-    core-postgres:
+    postgres:
       condition: service_healthy
   networks:
     - data-platform-net
@@ -75,11 +75,11 @@ x-spark-base: &spark-base
 services:
 
   # ── PostgreSQL (Shared Metadata + Warehouse) ───────────────────
-  core-postgres:
+  postgres:
     <<: *restart-policy
     image: postgres:${POSTGRES_VERSION:-16}
-    container_name: core-postgres
-    hostname: core-postgres
+    container_name: postgres
+    hostname: postgres
     ports:
       - "5432:5432"
     environment:
@@ -105,11 +105,11 @@ services:
           memory: 512M
 
   # ── Redis ──────────────────────────────────────────────────────
-  core-redis:
+  redis:
     <<: *restart-policy
     image: redis:${REDIS_VERSION:-7.2-bookworm}
-    container_name: core-redis
-    hostname: core-redis
+    container_name: redis
+    hostname: redis
     ports:
       - "6379:6379"
     command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
@@ -128,18 +128,18 @@ services:
           memory: 256M
 
   # ── Redis Insight (Redis UI) ───────────────────────────────────
-  core-redisinsight:
+  redisinsight:
     <<: *restart-policy
     image: redis/redisinsight:latest
-    container_name: core-redisinsight
-    hostname: core-redisinsight
+    container_name: redisinsight
+    hostname: redisinsight
     ports:
       - "8084:5540"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.core-redisinsight.rule=Host(`core-redisinsight.local`)"
-      - "traefik.http.routers.core-redisinsight.entrypoints=web"
-      - "traefik.http.services.core-redisinsight.loadbalancer.server.port=5540"
+      - "traefik.http.routers.redisinsight.rule=Host(`redisinsight.local`)"
+      - "traefik.http.routers.redisinsight.entrypoints=web"
+      - "traefik.http.services.redisinsight.loadbalancer.server.port=5540"
     networks:
       - data-platform-net
     deploy:
@@ -149,11 +149,11 @@ services:
           memory: 256M
 
   # ── MinIO (Data Lake — Bronze/Silver/Gold storage) ─────────────
-  storage-minio:
+  minio:
     <<: *restart-policy
     image: minio/minio:latest
-    container_name: storage-minio
-    hostname: storage-minio
+    container_name: minio
+    hostname: minio
     ports:
       - "9005:9000"
       - "9008:9001"
@@ -168,7 +168,7 @@ services:
       - "traefik.http.routers.minio-console.rule=Host(`minio-console.local`)"
       - "traefik.http.routers.minio-console.entrypoints=web"
       - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
-      - "traefik.http.routers.minio-api.rule=Host(`storage-minio.local`)"
+      - "traefik.http.routers.minio-api.rule=Host(`minio.local`)"
       - "traefik.http.routers.minio-api.entrypoints=web"
       - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
     networks:
@@ -186,11 +186,11 @@ services:
           memory: 512M
 
   # ── Zookeeper ──────────────────────────────────────────────────
-  msg-zookeeper:
+  zookeeper:
     <<: *restart-policy
     image: confluentinc/cp-zookeeper:7.8.0
-    hostname: msg-zookeeper
-    container_name: msg-zookeeper
+    hostname: zookeeper
+    container_name: zookeeper
     ports:
       - "2181:2181"
     environment:
@@ -207,21 +207,21 @@ services:
           memory: 128M
 
   # ── Kafka Broker (Zookeeper Mode) ──────────────────────────────
-  msg-kafka-broker:
+  kafka-broker:
     <<: *restart-policy
     image: confluentinc/cp-kafka:7.8.0
-    hostname: msg-kafka-broker
-    container_name: msg-kafka-broker
+    hostname: kafka-broker
+    container_name: kafka-broker
     ports:
       - "9092:9092"
       - "29092:29092"
       - "9999:9999"
     environment:
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:19092,EXTERNAL://0.0.0.0:9092,DOCKER://0.0.0.0:29092
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://msg-kafka-broker:19092,EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092,DOCKER://host.docker.internal:29092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-broker:19092,EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092,DOCKER://host.docker.internal:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,DOCKER:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_ZOOKEEPER_CONNECT: "msg-zookeeper:2181"
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
       KAFKA_BROKER_ID: 1
       KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -237,7 +237,7 @@ services:
       KAFKA_JVM_PERFORMANCE_OPTS: "-server -XX:+UseSerialGC"
       MALLOC_ARENA_MAX: "2"
     depends_on:
-      msg-zookeeper:
+      zookeeper:
         condition: service_started
     networks:
       - data-platform-net
@@ -254,20 +254,20 @@ services:
           memory: 512M
 
   # ── Schema Registry ────────────────────────────────────────────
-  msg-schema-registry:
+  schema-registry:
     <<: *restart-policy
     image: confluentinc/cp-schema-registry:7.8.0
-    hostname: msg-schema-registry
-    container_name: msg-schema-registry
+    hostname: schema-registry
+    container_name: schema-registry
     ports:
       - "8081:8081"
     environment:
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://msg-kafka-broker:19092
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka-broker:19092
       SCHEMA_REGISTRY_HOST_NAME: kafka-schema-registry
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
       SCHEMA_REGISTRY_JVM_OPTS: "-Xms128M -Xmx128M -XX:+UseSerialGC"
     depends_on:
-      msg-kafka-broker:
+      kafka-broker:
         condition: service_healthy
     networks:
       - data-platform-net
@@ -284,22 +284,22 @@ services:
           memory: 384M
 
   # ── Kafka REST Proxy ───────────────────────────────────────────
-  msg-kafka-rest:
+  kafka-rest:
     <<: *restart-policy
     image: confluentinc/cp-kafka-rest:7.8.0
-    hostname: msg-kafka-rest
-    container_name: msg-kafka-rest
+    hostname: kafka-rest
+    container_name: kafka-rest
     ports:
       - "8082:8082"
     environment:
       KAFKA_REST_LISTENERS: http://0.0.0.0:8082/
-      KAFKA_REST_SCHEMA_REGISTRY_URL: http://msg-schema-registry:8081/
+      KAFKA_REST_SCHEMA_REGISTRY_URL: http://schema-registry:8081/
       KAFKA_REST_HOST_NAME: kafka-rest-proxy
-      KAFKA_REST_BOOTSTRAP_SERVERS: PLAINTEXT://msg-kafka-broker:19092
+      KAFKA_REST_BOOTSTRAP_SERVERS: PLAINTEXT://kafka-broker:19092
       KAFKA_REST_JVM_OPTS: "-Xms128M -Xmx128M -XX:+UseSerialGC"
     depends_on:
-      - msg-kafka-broker
-      - msg-schema-registry
+      - kafka-broker
+      - schema-registry
     networks:
       - data-platform-net
     deploy:
@@ -309,24 +309,24 @@ services:
           memory: 256M
 
   # ── Kafka Connect (with MySQL CDC & Datagen Connectors) ────────
-  msg-kafka-connect:
+  kafka-connect:
     <<: *restart-policy
     image: confluentinc/cp-kafka-connect:7.8.0
-    hostname: msg-kafka-connect
-    container_name: msg-kafka-connect
+    hostname: kafka-connect
+    container_name: kafka-connect
     ports:
       - "8083:8083"
     environment:
-      CONNECT_BOOTSTRAP_SERVERS: "msg-kafka-broker:19092"
+      CONNECT_BOOTSTRAP_SERVERS: "kafka-broker:19092"
       CONNECT_REST_PORT: 8083
       CONNECT_GROUP_ID: compose-connect-group
       CONNECT_CONFIG_STORAGE_TOPIC: docker-connect-configs
       CONNECT_OFFSET_STORAGE_TOPIC: docker-connect-offsets
       CONNECT_STATUS_STORAGE_TOPIC: docker-connect-status
       CONNECT_KEY_CONVERTER: io.confluent.connect.avro.AvroConverter
-      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: 'http://msg-schema-registry:8081'
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
       CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
-      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: 'http://msg-schema-registry:8081'
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
       CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
       CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
       CONNECT_REST_ADVERTISED_HOST_NAME: "kafka-connect"
@@ -340,9 +340,9 @@ services:
     volumes:
       - ./connectors:/etc/kafka-connect/jars/
     depends_on:
-      msg-kafka-rest:
+      kafka-rest:
         condition: service_started
-      msg-schema-registry:
+      schema-registry:
         condition: service_healthy
     networks:
       - data-platform-net
@@ -360,20 +360,20 @@ services:
           memory: 768M
 
   # ── ksqlDB Server ──────────────────────────────────────────────
-  msg-ksqldb:
+  ksqldb:
     <<: *restart-policy
     image: confluentinc/cp-ksqldb-server:7.8.0
-    hostname: msg-ksqldb
-    container_name: msg-ksqldb
+    hostname: ksqldb
+    container_name: ksqldb
     ports:
       - "8088:8088"
     environment:
-      KSQL_BOOTSTRAP_SERVERS: PLAINTEXT://msg-kafka-broker:19092
+      KSQL_BOOTSTRAP_SERVERS: PLAINTEXT://kafka-broker:19092
       KSQL_LISTENERS: http://0.0.0.0:8088/
       KSQL_KSQL_SERVICE_ID: ksqldb-server_
       KSQL_JVM_OPTS: "-Xms256M -Xmx384M -XX:+UseSerialGC"
     depends_on:
-      msg-kafka-broker:
+      kafka-broker:
         condition: service_healthy
     networks:
       - data-platform-net
@@ -384,11 +384,11 @@ services:
           memory: 512M
 
   # ── PostgreSQL (Conduktor Metadata DB) ──────────────────────────
-  ui-conduktor-db:
+  conduktor-db:
     <<: *restart-policy
     image: postgres:16-alpine
-    hostname: ui-conduktor-db
-    container_name: ui-conduktor-db
+    hostname: conduktor-db
+    container_name: conduktor-db
     volumes:
       - pg_data:/var/lib/postgresql/data
     environment:
@@ -410,23 +410,23 @@ services:
           memory: 192M
 
   # ── Conduktor Console ──────────────────────────────────────────
-  ui-conduktor:
+  conduktor:
     <<: *restart-policy
     image: conduktor/conduktor-console:1.44.1
-    hostname: ui-conduktor
-    container_name: ui-conduktor
+    hostname: conduktor
+    container_name: conduktor
     ports:
       - "8080:8080"
     volumes:
       - conduktor_data:/var/conduktor
     environment:
-      CDK_DATABASE_URL: "ui-conduktor-db://conduktor:${CONDUKTOR_PG_PASSWORD:-some_password}@ui-conduktor-db:5432/conduktor-console"
+      CDK_DATABASE_URL: "conduktor-db://conduktor:${CONDUKTOR_PG_PASSWORD:-some_password}@conduktor-db:5432/conduktor-console"
       CDK_CLUSTERS_0_ID: "default"
       CDK_CLUSTERS_0_NAME: "My Local Kafka Cluster"
       CDK_CLUSTERS_0_COLOR: "#0013E7"
-      CDK_CLUSTERS_0_BOOTSTRAPSERVERS: "PLAINTEXT://msg-kafka-broker:19092"
-      CDK_CLUSTERS_0_SCHEMAREGISTRY_URL: "http://msg-schema-registry:8081"
-      CDK_CLUSTERS_0_KAFKACONNECTS_0_URL: "http://msg-kafka-connect:8083"
+      CDK_CLUSTERS_0_BOOTSTRAPSERVERS: "PLAINTEXT://kafka-broker:19092"
+      CDK_CLUSTERS_0_SCHEMAREGISTRY_URL: "http://schema-registry:8081"
+      CDK_CLUSTERS_0_KAFKACONNECTS_0_URL: "http://kafka-connect:8083"
       CDK_CLUSTERS_0_KAFKACONNECTS_0_NAME: "full stack kafka connect"
       CONSOLE_JAVA_OPTS: "-Xms256M -Xmx512M"
     labels:
@@ -435,9 +435,9 @@ services:
       - "traefik.http.routers.conduktor.entrypoints=web"
       - "traefik.http.services.conduktor.loadbalancer.server.port=8080"
     depends_on:
-      ui-conduktor-db:
+      conduktor-db:
         condition: service_healthy
-      msg-schema-registry:
+      schema-registry:
         condition: service_healthy
     networks:
       - data-platform-net
@@ -448,12 +448,12 @@ services:
           memory: 2048M
 
   # ── Spark Master ───────────────────────────────────────────────
-  compute-spark-master:
+  spark-master:
     <<: *spark-base
-    container_name: compute-spark-master
-    hostname: compute-spark-master
+    container_name: spark-master
+    hostname: spark-master
     command: >
-      /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master --host compute-spark-master --port 7077 --webui-port 8080
+      /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master --host spark-master --port 7077 --webui-port 8080
     ports:
       - "8085:8080"
       - "7077:7077"
@@ -471,7 +471,7 @@ services:
       - spark_ivy_cache:/root/.ivy2
       - ./config/spark-defaults.conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
     depends_on:
-      meta-nessie:
+      nessie:
         condition: service_started
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080/" ]
@@ -485,12 +485,12 @@ services:
           memory: 512M
 
   # ── Spark Worker ───────────────────────────────────────────────
-  compute-spark-worker-1:
+  spark-worker-1:
     <<: *spark-base
-    container_name: compute-spark-worker-1
-    hostname: compute-spark-worker-1
+    container_name: spark-worker-1
+    hostname: spark-worker-1
     command: >
-      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://compute-spark-master:7077 --webui-port 8081 --cores 2 --memory 1536m
+      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077 --webui-port 8081 --cores 2 --memory 1536m
     ports:
       - "8092:8081"
     environment:
@@ -506,7 +506,7 @@ services:
       - ./config/spark-defaults.conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
       - ./data:/data
     depends_on:
-      compute-spark-master:
+      spark-master:
         condition: service_healthy
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8081/" ]
@@ -520,12 +520,12 @@ services:
           memory: 1536M
 
   # ── Spark Worker 2 ───────────────────────────────────────────────
-  compute-spark-worker-2:
+  spark-worker-2:
     <<: *spark-base
-    container_name: compute-spark-worker-2
-    hostname: compute-spark-worker-2
+    container_name: spark-worker-2
+    hostname: spark-worker-2
     command: >
-      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://compute-spark-master:7077 --webui-port 8081 --cores 2 --memory 1536m
+      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077 --webui-port 8081 --cores 2 --memory 1536m
     ports:
       - "8093:8081"
     environment:
@@ -541,7 +541,7 @@ services:
       - ./config/spark-defaults.conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
       - ./data:/data
     depends_on:
-      compute-spark-master:
+      spark-master:
         condition: service_healthy
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8081/" ]
@@ -555,18 +555,18 @@ services:
           memory: 1536M
 
   # ── Spark Notebook (JupyterLab) ────────────────────────────────
-  ide-jupyter-workspace:
+  jupyter-workspace:
     <<: *restart-policy
     build:
       context: .
       dockerfile: docker/Dockerfile.notebook
-    container_name: ide-jupyter-workspace
-    hostname: ide-jupyter-workspace
+    container_name: jupyter-workspace
+    hostname: jupyter-workspace
     ports:
       - "8889:8888"
       - "4042:4040"
     environment:
-      SPARK_MASTER: spark://compute-spark-master:7077
+      SPARK_MASTER: spark://spark-master:7077
       PYSPARK_PYTHON: "python3"
       PYSPARK_DRIVER_PYTHON: "python3"
       JUPYTER_TOKEN: "${JUPYTER_TOKEN:-admin}"
@@ -577,7 +577,7 @@ services:
       - ./data:/data
       - ./scripts:/home/jovyan/scripts
     depends_on:
-      compute-spark-master:
+      spark-master:
         condition: service_healthy
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8888/api" ]
@@ -593,10 +593,10 @@ services:
           memory: 768M
 
   # ── Spark History Server ───────────────────────────────────────
-  compute-spark-history:
+  spark-history:
     <<: *spark-base
-    container_name: compute-spark-history
-    hostname: compute-spark-history
+    container_name: spark-history
+    hostname: spark-history
     command: >
       /opt/spark/bin/spark-class org.apache.spark.deploy.history.HistoryServer
     ports:
@@ -604,13 +604,13 @@ services:
     environment:
       <<: *spark-env
       SPARK_HISTORY_OPTS: >-
-        -Dspark.history.fs.logDirectory=s3a://spark-logs/event-logs -Dspark.hadoop.fs.s3a.endpoint=http://storage-minio:9000 -Dspark.hadoop.fs.s3a.access.key=minioadmin -Dspark.hadoop.fs.s3a.secret.key=minioadmin -Dspark.hadoop.fs.s3a.path.style.access=true -Dspark.hadoop.fs.s3a.connection.ssl.enabled=false -Dspark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
+        -Dspark.history.fs.logDirectory=s3a://spark-logs/event-logs -Dspark.hadoop.fs.s3a.endpoint=http://minio:9000 -Dspark.hadoop.fs.s3a.access.key=minioadmin -Dspark.hadoop.fs.s3a.secret.key=minioadmin -Dspark.hadoop.fs.s3a.path.style.access=true -Dspark.hadoop.fs.s3a.connection.ssl.enabled=false -Dspark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
       SPARK_DAEMON_MEMORY: 512m
       SPARK_DAEMON_JAVA_OPTS: "-XX:+UseSerialGC -XX:MaxMetaspaceSize=128m"
     volumes:
       - ./config/spark-defaults.conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
     depends_on:
-      storage-minio:
+      minio:
         condition: service_healthy
     deploy:
       resources:
@@ -619,11 +619,11 @@ services:
           memory: 384M
 
   # ── Nessie (Iceberg Catalog) ───────────────────────────────────
-  meta-nessie:
+  nessie:
     <<: *restart-policy
     image: projectnessie/nessie:latest
-    container_name: meta-nessie
-    hostname: meta-nessie
+    container_name: nessie
+    hostname: nessie
     ports:
       - "19120:19120"
     environment:
@@ -632,7 +632,7 @@ services:
     networks:
       - data-platform-net
     depends_on:
-      core-postgres:
+      postgres:
         condition: service_healthy
     deploy:
       resources:
@@ -641,11 +641,11 @@ services:
           memory: 384M
 
   # ── Dremio (Federation SQL Engine) ────────────────────────────
-  query-dremio:
+  dremio:
     <<: *restart-policy
     image: dremio/dremio-oss:latest
-    container_name: query-dremio
-    hostname: query-dremio
+    container_name: dremio
+    hostname: dremio
     ports:
       - "9047:9047"
       - "31010:31010"
@@ -658,7 +658,7 @@ services:
     volumes:
       - dremio_data:/opt/dremio/data
     depends_on:
-      meta-nessie:
+      nessie:
         condition: service_started
     networks:
       - data-platform-net
@@ -669,11 +669,11 @@ services:
           memory: 2048M
 
   # ── ClickHouse (OLAP Data Warehouse — Gold Layer) ──────────────
-  dw-clickhouse:
+  clickhouse:
     <<: *restart-policy
     image: clickhouse/clickhouse-server:24.3-alpine
-    container_name: dw-clickhouse
-    hostname: dw-clickhouse
+    container_name: clickhouse
+    hostname: clickhouse
     ports:
       - "8123:8123"
       - "9009:9000"
@@ -689,7 +689,7 @@ services:
         soft: 262144
         hard: 262144
     depends_on:
-      core-postgres:
+      postgres:
         condition: service_healthy
     networks:
       - data-platform-net
@@ -705,11 +705,11 @@ services:
           memory: 2560M
 
   # ── Prometheus (Metrics Collection) ───────────────────────────
-  obs-prometheus:
+  prometheus:
     <<: *restart-policy
     image: prom/prometheus:v2.51.2
-    container_name: obs-prometheus
-    hostname: obs-prometheus
+    container_name: prometheus
+    hostname: prometheus
     ports:
       - "9090:9090"
     command:
@@ -727,7 +727,7 @@ services:
       retries: 3
       start_period: 10s
     depends_on:
-      compute-spark-master:
+      spark-master:
         condition: service_healthy
     networks:
       - data-platform-net
@@ -738,11 +738,11 @@ services:
           memory: 512M
 
   # ── Grafana (Dashboards) ───────────────────────────────────────
-  obs-grafana:
+  grafana:
     <<: *restart-policy
     image: grafana/grafana:10.4.2
-    container_name: obs-grafana
-    hostname: obs-grafana
+    container_name: grafana
+    hostname: grafana
     ports:
       - "3001:3000"
     environment:
@@ -754,13 +754,13 @@ services:
       - grafana_data:/var/lib/grafana
       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
-      obs-prometheus:
+      prometheus:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.obs-grafana.rule=Host(`obs-grafana.local`)"
-      - "traefik.http.routers.obs-grafana.entrypoints=web"
-      - "traefik.http.services.obs-grafana.loadbalancer.server.port=3000"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.local`)"
+      - "traefik.http.routers.grafana.entrypoints=web"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
     networks:
       - data-platform-net
     healthcheck:
@@ -775,11 +775,11 @@ services:
           memory: 256M
 
   # ── Elasticsearch (Search engine for OpenMetadata) ─────────────
-  obs-elasticsearch:
+  elasticsearch:
     <<: *restart-policy
     image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
-    container_name: obs-elasticsearch
-    hostname: obs-elasticsearch
+    container_name: elasticsearch
+    hostname: elasticsearch
     ports:
       - "9200:9200"
     environment:
@@ -812,19 +812,19 @@ services:
           memory: 1536M
 
   # ── Kibana (UI for Elasticsearch) ──────────────────────────────
-  obs-kibana:
+  kibana:
     <<: *restart-policy
     image: docker.elastic.co/kibana/kibana:8.10.2
-    container_name: obs-kibana
-    hostname: obs-kibana
+    container_name: kibana
+    hostname: kibana
     ports:
       - "5601:5601"
     environment:
-      ELASTICSEARCH_HOSTS: "http://obs-elasticsearch:9200"
+      ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
     networks:
       - data-platform-net
     depends_on:
-      obs-elasticsearch:
+      elasticsearch:
         condition: service_healthy
     deploy:
       resources:
@@ -833,37 +833,37 @@ services:
           memory: 1024M
 
   # ── OpenMetadata (Data Governance — Catalog + Lineage) ─────────
-  meta-openmetadata:
+  openmetadata:
     <<: *restart-policy
     image: openmetadata/server:1.3.1
-    container_name: meta-openmetadata
-    hostname: meta-openmetadata
+    container_name: openmetadata
+    hostname: openmetadata
     ports:
       - "8585:8585"
     environment:
       OPENMETADATA_CLUSTER_NAME: "pyspark-platform"
       DB_DRIVER_CLASS: "org.postgresql.Driver"
       DB_SCHEME: "postgresql"
-      DB_HOST: "core-postgres"
+      DB_HOST: "postgres"
       DB_PORT: "5432"
       DB_USER: "${OPENMETADATA_DB_USER:-openmetadata}"
       DB_USER_PASSWORD: "${OPENMETADATA_DB_PASSWORD:-openmetadata}"
       DB_NAME: "openmetadata"
       SEARCH_TYPE: "elasticsearch"
-      ELASTICSEARCH_HOST: "obs-elasticsearch"
+      ELASTICSEARCH_HOST: "elasticsearch"
       ELASTICSEARCH_PORT: "9200"
       ELASTICSEARCH_SCHEME: "http"
       AUTHENTICATION_PROVIDER: "basic"
       JAVA_OPTS: "-Xms512M -Xmx768M -XX:+UseSerialGC -XX:MaxMetaspaceSize=256m"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.meta-openmetadata.rule=Host(`meta-openmetadata.local`)"
-      - "traefik.http.routers.meta-openmetadata.entrypoints=web"
-      - "traefik.http.services.meta-openmetadata.loadbalancer.server.port=8585"
+      - "traefik.http.routers.openmetadata.rule=Host(`openmetadata.local`)"
+      - "traefik.http.routers.openmetadata.entrypoints=web"
+      - "traefik.http.services.openmetadata.loadbalancer.server.port=8585"
     depends_on:
-      core-postgres:
+      postgres:
         condition: service_healthy
-      obs-elasticsearch:
+      elasticsearch:
         condition: service_healthy
     networks:
       - data-platform-net
@@ -880,11 +880,11 @@ services:
           memory: 1536M
 
   # ── Traefik (Reverse Proxy & Service Discovery) ──────────────
-  core-traefik:
+  traefik:
     <<: *restart-policy
     image: traefik:v3.3
-    container_name: core-traefik
-    hostname: core-traefik
+    container_name: traefik
+    hostname: traefik
     user: root
     ports:
       - "80:80"
@@ -901,9 +901,9 @@ services:
           memory: 128M
 
   # ── Airflow API Server ─────────────────────────────────────────
-  orch-airflow-web:
+  airflow-web:
     <<: *airflow-common
-    container_name: orch-airflow-web
+    container_name: airflow-web
     command: api-server
     ports:
       - "8086:8080"
@@ -921,7 +921,7 @@ services:
       - "traefik.http.services.airflow.loadbalancer.server.port=8080"
     depends_on:
       <<: *airflow-common-depends-on
-      orch-airflow-init:
+      airflow-init:
         condition: service_completed_successfully
     deploy:
       resources:
@@ -930,9 +930,9 @@ services:
           memory: 512M
 
   # ── Airflow Scheduler ──────────────────────────────────────────
-  orch-airflow-scheduler:
+  airflow-scheduler:
     <<: *airflow-common
-    container_name: orch-airflow-scheduler
+    container_name: airflow-scheduler
     command: scheduler
     healthcheck:
       test: [ "CMD", "curl", "--fail", "http://localhost:8974/health" ]
@@ -943,7 +943,7 @@ services:
     restart: always
     depends_on:
       <<: *airflow-common-depends-on
-      orch-airflow-init:
+      airflow-init:
         condition: service_completed_successfully
     deploy:
       resources:
@@ -965,7 +965,7 @@ services:
     restart: always
     depends_on:
       <<: *airflow-common-depends-on
-      orch-airflow-init:
+      airflow-init:
         condition: service_completed_successfully
     deploy:
       resources:
@@ -974,9 +974,9 @@ services:
           memory: 640M
 
   # ── Airflow Worker ─────────────────────────────────────────────
-  orch-airflow-worker:
+  airflow-worker:
     <<: *airflow-common
-    container_name: orch-airflow-worker
+    container_name: airflow-worker
     command: celery worker
     healthcheck:
       test: [ "CMD-SHELL", 'celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}" || celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"' ]
@@ -990,9 +990,9 @@ services:
     restart: always
     depends_on:
       <<: *airflow-common-depends-on
-      orch-airflow-web:
+      airflow-web:
         condition: service_healthy
-      orch-airflow-init:
+      airflow-init:
         condition: service_completed_successfully
     deploy:
       resources:
@@ -1001,9 +1001,9 @@ services:
           memory: 768M
 
   # ── Airflow Triggerer ──────────────────────────────────────────
-  orch-airflow-triggerer:
+  airflow-triggerer:
     <<: *airflow-common
-    container_name: orch-airflow-triggerer
+    container_name: airflow-triggerer
     command: triggerer
     healthcheck:
       test: [ "CMD-SHELL", "pgrep -f 'airflow triggerer' || exit 1" ]
@@ -1014,7 +1014,7 @@ services:
     restart: always
     depends_on:
       <<: *airflow-common-depends-on
-      orch-airflow-init:
+      airflow-init:
         condition: service_completed_successfully
     deploy:
       resources:
@@ -1023,9 +1023,9 @@ services:
           memory: 640M
 
   # ── Airflow Init (runs once to migrate DB and create admin) ────
-  orch-airflow-init:
+  airflow-init:
     <<: *airflow-common
-    container_name: orch-airflow-init
+    container_name: airflow-init
     command:
       - bash
       - -c
@@ -1041,7 +1041,7 @@ services:
         airflow connections delete spark_default || true
         airflow connections add spark_default \
           --conn-type spark \
-          --conn-host spark://compute-spark-master \
+          --conn-host spark://spark-master \
           --conn-port 7077
         echo "✅ Airflow init complete"
     environment:
@@ -1053,9 +1053,9 @@ services:
       _PIP_ADDITIONAL_REQUIREMENTS: ''
 
   # ── Airflow CLI (Debug Tool) ───────────────────────────────────
-  orch-airflow-cli:
+  airflow-cli:
     <<: *airflow-common
-    container_name: orch-airflow-cli
+    container_name: airflow-cli
     profiles:
       - debug
     environment:
@@ -1091,7 +1091,7 @@ services:
     restart: always
     depends_on:
       <<: *airflow-common-depends-on
-      orch-airflow-init:
+      airflow-init:
         condition: service_completed_successfully
     deploy:
       resources:
@@ -1106,7 +1106,7 @@ services:
     container_name: bi-superset-init
     environment:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
-      DATABASE_URL: postgresql+psycopg2://bi-superset:superset@core-postgres:5432/superset
+      DATABASE_URL: postgresql+psycopg2://bi-superset:superset@postgres:5432/superset
       SUPERSET_CONFIG_PATH: /app/superset_config.py
     dns:
       - 8.8.8.8
@@ -1115,7 +1115,7 @@ services:
     command: >
       bash -c "pip install --quiet psycopg2-binary clickhouse-connect && superset db upgrade && superset fab create-admin --username ${SUPERSET_ADMIN_USER:-admin} --firstname Admin --lastname User --email admin@superset.local --password ${SUPERSET_ADMIN_PASSWORD:-admin} || true && superset init && echo '✅ Superset init complete'"
     depends_on:
-      core-postgres:
+      postgres:
         condition: service_healthy
     networks:
       - data-platform-net
@@ -1135,7 +1135,7 @@ services:
       - "8087:8088"
     environment:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
-      DATABASE_URL: postgresql+psycopg2://bi-superset:superset@core-postgres:5432/superset
+      DATABASE_URL: postgresql+psycopg2://bi-superset:superset@postgres:5432/superset
       SUPERSET_CONFIG_PATH: /app/superset_config.py
       SUPERSET_LOAD_EXAMPLES: "no"
     dns:
@@ -1149,7 +1149,7 @@ services:
       - "traefik.http.routers.bi-superset.entrypoints=web"
       - "traefik.http.services.bi-superset.loadbalancer.server.port=8088"
     depends_on:
-      core-postgres:
+      postgres:
         condition: service_healthy
       bi-superset-init:
         condition: service_completed_successfully
