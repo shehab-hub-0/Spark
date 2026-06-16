@@ -21,12 +21,10 @@
   <users>
     <!-- Admin user — full access, restricted to Docker internal network -->
     <admin>
-      <password_sha256_hex>8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918</password_sha256_hex>
-      <!-- SHA256 of "admin" — CHANGE IN PRODUCTION -->
+      <password from_env="CLICKHOUSE_ADMIN_PASSWORD" />
+      <!-- Pulled from .env via CLICKHOUSE_ADMIN_PASSWORD -->
       <networks>
-        <ip>172.29.0.0/16</ip>     <!-- Docker bridge network only -->
-        <ip>::1</ip>                <!-- localhost IPv6 -->
-        <ip>127.0.0.1</ip>         <!-- localhost IPv4 -->
+        <ip>::/0</ip>               <!-- Allow any IP (Docker network, host machine gateway, etc.) -->
       </networks>
       <profile>default</profile>
       <quota>default</quota>

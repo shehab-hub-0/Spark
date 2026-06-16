@@ -55,3 +55,7 @@ Desktop.ini
 
 # ── Kafka Connect plugins (downloaded at runtime) ────────────────
 connectors/
+
+# ── User Custom Scripts & Notebooks ──────────────────────────────
+notebooks/
+scripts/
