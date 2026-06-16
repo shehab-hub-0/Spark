@@ -3,7 +3,6 @@
 # ================================================================
 
 # ── Secrets & Environment ────────────────────────────────────────
-.env
 .env.local
 .env.production
 
@@ -55,3 +54,4 @@ Desktop.ini
 
 
 # ── User Custom Scripts & Notebooks ──────────────────────────────
+no/
