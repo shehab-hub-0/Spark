@@ -45,29 +45,16 @@ git pull origin main
 عشان تشغل المعمل على جهازك، اتبع الخطوات دي:
 
 
-*(لو إنت شغال على Linux/Mac، اتأكد إن السكريبت معاه صلاحية التشغيل: `chmod +x build_and_push.sh`)*
-
-### 2. تشغيل المعمل
-شغل السكريبت المساعد:
-```bash
-./build_and_push.sh
-```
 **أو يمكنك استخدام الأمر المباشر لبناء خدمات Spark والـ Data Lakehouse فقط:**
 ```bash
-docker compose up -d --build postgres minio spark-master spark-worker-1 spark-worker-2 jupyter-workspace spark-history nessie dremio clickhouse
+docker compose up -d --build
 ```
 
 **أو يمكنك استخدام الأمر المباشر لتشغيل خدمات Spark والـ Data Lakehouse فقط:**
 ```bash
-docker compose up -d postgres minio spark-master spark-worker-1 spark-worker-2 jupyter-workspace spark-history nessie dremio clickhouse
+docker compose up -d
 ```
 
-**السكريبت هيسألك سؤالين:**
-1. `Do you want to pull and run all services or just the Spark stack? (all/spark) [all]:`
-   - 👉 **اكتب `spark` واضغط Enter.** (ده هيشغل خدمات المعمل الخاصة بيك بس ويوفر موارد جهازك).
-2. `Do you want to build new images or just start existing ones? (build/up) [build]:`
-   - 👉 **اكتب `build` في أول مرة تشغل فيها المعمل.** (عشان يحمل ويبني الصور الأساسية).
-   - 👉 **في المرات الجاية، اكتب `up` واضغط Enter.** (عشان يشغل المعمل بسرعة بدون ما يحمل من النت تاني).
 
 ---
 

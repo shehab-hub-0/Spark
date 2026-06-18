@@ -105,48 +105,48 @@ services:
           memory: 512M
 
   # ── Redis ──────────────────────────────────────────────────────
-  redis:
-    <<: *restart-policy
-    image: redis:${REDIS_VERSION:-7.2-bookworm}
-    container_name: redis
-    hostname: redis
-    ports:
-      - "6379:6379"
-    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 10s
-      timeout: 3s
-      retries: 10
-      start_period: 30s
-    networks:
-      - data-platform-net
-    deploy:
-      resources:
-        limits:
-          cpus: '0.2'
-          memory: 256M
+  #   redis:
+  #     <<: *restart-policy
+  #     image: redis:${REDIS_VERSION:-7.2-bookworm}
+  #     container_name: redis
+  #     hostname: redis
+  #     ports:
+  #       - "6379:6379"
+  #     command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+  #     healthcheck:
+  #       test: [ "CMD", "redis-cli", "ping" ]
+  #       interval: 10s
+  #       timeout: 3s
+  #       retries: 10
+  #       start_period: 30s
+  #     networks:
+  #       - data-platform-net
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.2'
+  #           memory: 256M
 
   # ── Redis Insight (Redis UI) ───────────────────────────────────
-  redisinsight:
-    <<: *restart-policy
-    image: redis/redisinsight:latest
-    container_name: redisinsight
-    hostname: redisinsight
-    ports:
-      - "8084:5540"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.redisinsight.rule=Host(`redisinsight.local`)"
-      - "traefik.http.routers.redisinsight.entrypoints=web"
-      - "traefik.http.services.redisinsight.loadbalancer.server.port=5540"
-    networks:
-      - data-platform-net
-    deploy:
-      resources:
-        limits:
-          cpus: '0.2'
-          memory: 256M
+  #   redisinsight:
+  #     <<: *restart-policy
+  #     image: redis/redisinsight:latest
+  #     container_name: redisinsight
+  #     hostname: redisinsight
+  #     ports:
+  #       - "8084:5540"
+  #     labels:
+  #       - "traefik.enable=true"
+  #       - "traefik.http.routers.redisinsight.rule=Host(`redisinsight.local`)"
+  #       - "traefik.http.routers.redisinsight.entrypoints=web"
+  #       - "traefik.http.services.redisinsight.loadbalancer.server.port=5540"
+  #     networks:
+  #       - data-platform-net
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.2'
+  #           memory: 256M
 
   # ── MinIO (Data Lake — Bronze/Silver/Gold storage) ─────────────
   minio:
@@ -186,266 +186,266 @@ services:
           memory: 512M
 
   # ── Zookeeper ──────────────────────────────────────────────────
-  zookeeper:
-    <<: *restart-policy
-    image: confluentinc/cp-zookeeper:7.8.0
-    hostname: zookeeper
-    container_name: zookeeper
-    ports:
-      - "2181:2181"
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_SERVER_ID: 1
-      ZOOKEEPER_SERVERS: zoo1:2888:3888
-      ZOOKEEPER_JVMFLAGS: "-Xms64M -Xmx64M -XX:+UseSerialGC"
-    networks:
-      - data-platform-net
-    deploy:
-      resources:
-        limits:
-          cpus: '0.2'
-          memory: 128M
+  #   zookeeper:
+  #     <<: *restart-policy
+  #     image: confluentinc/cp-zookeeper:7.8.0
+  #     hostname: zookeeper
+  #     container_name: zookeeper
+  #     ports:
+  #       - "2181:2181"
+  #     environment:
+  #       ZOOKEEPER_CLIENT_PORT: 2181
+  #       ZOOKEEPER_SERVER_ID: 1
+  #       ZOOKEEPER_SERVERS: zoo1:2888:3888
+  #       ZOOKEEPER_JVMFLAGS: "-Xms64M -Xmx64M -XX:+UseSerialGC"
+  #     networks:
+  #       - data-platform-net
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.2'
+  #           memory: 128M
 
   # ── Kafka Broker (Zookeeper Mode) ──────────────────────────────
-  kafka-broker:
-    <<: *restart-policy
-    image: confluentinc/cp-kafka:7.8.0
-    hostname: kafka-broker
-    container_name: kafka-broker
-    ports:
-      - "9092:9092"
-      - "29092:29092"
-      - "9999:9999"
-    environment:
-      KAFKA_LISTENERS: INTERNAL://0.0.0.0:19092,EXTERNAL://0.0.0.0:9092,DOCKER://0.0.0.0:29092
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-broker:19092,EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092,DOCKER://host.docker.internal:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,DOCKER:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-      KAFKA_BROKER_ID: 1
-      KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_JMX_PORT: 9999
-      KAFKA_JMX_HOSTNAME: ${DOCKER_HOST_IP:-127.0.0.1}
-      KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.authorizer.AclAuthorizer
-      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "true"
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_LOG_RETENTION_HOURS: 24
-      KAFKA_HEAP_OPTS: "-Xms256M -Xmx256M -XX:+UseSerialGC"
-      KAFKA_JVM_PERFORMANCE_OPTS: "-server -XX:+UseSerialGC"
-      MALLOC_ARENA_MAX: "2"
-    depends_on:
-      zookeeper:
-        condition: service_started
-    networks:
-      - data-platform-net
-    healthcheck:
-      test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "127.0.0.1:19092" ]
-      interval: 20s
-      timeout: 15s
-      retries: 10
-      start_period: 180s
-    deploy:
-      resources:
-        limits:
-          cpus: '0.8'
-          memory: 512M
+  #   kafka-broker:
+  #     <<: *restart-policy
+  #     image: confluentinc/cp-kafka:7.8.0
+  #     hostname: kafka-broker
+  #     container_name: kafka-broker
+  #     ports:
+  #       - "9092:9092"
+  #       - "29092:29092"
+  #       - "9999:9999"
+  #     environment:
+  #       KAFKA_LISTENERS: INTERNAL://0.0.0.0:19092,EXTERNAL://0.0.0.0:9092,DOCKER://0.0.0.0:29092
+  #       KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-broker:19092,EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092,DOCKER://host.docker.internal:29092
+  #       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,DOCKER:PLAINTEXT
+  #       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+  #       KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+  #       KAFKA_BROKER_ID: 1
+  #       KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+  #       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+  #       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+  #       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+  #       KAFKA_JMX_PORT: 9999
+  #       KAFKA_JMX_HOSTNAME: ${DOCKER_HOST_IP:-127.0.0.1}
+  #       KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.authorizer.AclAuthorizer
+  #       KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "true"
+  #       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+  #       KAFKA_LOG_RETENTION_HOURS: 24
+  #       KAFKA_HEAP_OPTS: "-Xms256M -Xmx256M -XX:+UseSerialGC"
+  #       KAFKA_JVM_PERFORMANCE_OPTS: "-server -XX:+UseSerialGC"
+  #       MALLOC_ARENA_MAX: "2"
+  #     depends_on:
+  #       zookeeper:
+  #         condition: service_started
+  #     networks:
+  #       - data-platform-net
+  #     healthcheck:
+  #       test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "127.0.0.1:19092" ]
+  #       interval: 20s
+  #       timeout: 15s
+  #       retries: 10
+  #       start_period: 180s
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.8'
+  #           memory: 512M
 
   # ── Schema Registry ────────────────────────────────────────────
-  schema-registry:
-    <<: *restart-policy
-    image: confluentinc/cp-schema-registry:7.8.0
-    hostname: schema-registry
-    container_name: schema-registry
-    ports:
-      - "8081:8081"
-    environment:
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka-broker:19092
-      SCHEMA_REGISTRY_HOST_NAME: kafka-schema-registry
-      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
-      SCHEMA_REGISTRY_JVM_OPTS: "-Xms128M -Xmx128M -XX:+UseSerialGC"
-    depends_on:
-      kafka-broker:
-        condition: service_healthy
-    networks:
-      - data-platform-net
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:8081/subjects || exit 1" ]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-      start_period: 60s
-    deploy:
-      resources:
-        limits:
-          cpus: '0.3'
-          memory: 384M
+  #   schema-registry:
+  #     <<: *restart-policy
+  #     image: confluentinc/cp-schema-registry:7.8.0
+  #     hostname: schema-registry
+  #     container_name: schema-registry
+  #     ports:
+  #       - "8081:8081"
+  #     environment:
+  #       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka-broker:19092
+  #       SCHEMA_REGISTRY_HOST_NAME: kafka-schema-registry
+  #       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+  #       SCHEMA_REGISTRY_JVM_OPTS: "-Xms128M -Xmx128M -XX:+UseSerialGC"
+  #     depends_on:
+  #       kafka-broker:
+  #         condition: service_healthy
+  #     networks:
+  #       - data-platform-net
+  #     healthcheck:
+  #       test: [ "CMD-SHELL", "curl -f http://localhost:8081/subjects || exit 1" ]
+  #       interval: 15s
+  #       timeout: 5s
+  #       retries: 10
+  #       start_period: 60s
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.3'
+  #           memory: 384M
 
   # ── Kafka REST Proxy ───────────────────────────────────────────
-  kafka-rest:
-    <<: *restart-policy
-    image: confluentinc/cp-kafka-rest:7.8.0
-    hostname: kafka-rest
-    container_name: kafka-rest
-    ports:
-      - "8082:8082"
-    environment:
-      KAFKA_REST_LISTENERS: http://0.0.0.0:8082/
-      KAFKA_REST_SCHEMA_REGISTRY_URL: http://schema-registry:8081/
-      KAFKA_REST_HOST_NAME: kafka-rest-proxy
-      KAFKA_REST_BOOTSTRAP_SERVERS: PLAINTEXT://kafka-broker:19092
-      KAFKA_REST_JVM_OPTS: "-Xms128M -Xmx128M -XX:+UseSerialGC"
-    depends_on:
-      - kafka-broker
-      - schema-registry
-    networks:
-      - data-platform-net
-    deploy:
-      resources:
-        limits:
-          cpus: '0.2'
-          memory: 256M
+  #   kafka-rest:
+  #     <<: *restart-policy
+  #     image: confluentinc/cp-kafka-rest:7.8.0
+  #     hostname: kafka-rest
+  #     container_name: kafka-rest
+  #     ports:
+  #       - "8082:8082"
+  #     environment:
+  #       KAFKA_REST_LISTENERS: http://0.0.0.0:8082/
+  #       KAFKA_REST_SCHEMA_REGISTRY_URL: http://schema-registry:8081/
+  #       KAFKA_REST_HOST_NAME: kafka-rest-proxy
+  #       KAFKA_REST_BOOTSTRAP_SERVERS: PLAINTEXT://kafka-broker:19092
+  #       KAFKA_REST_JVM_OPTS: "-Xms128M -Xmx128M -XX:+UseSerialGC"
+  #     depends_on:
+  #       - kafka-broker
+  #       - schema-registry
+  #     networks:
+  #       - data-platform-net
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.2'
+  #           memory: 256M
 
   # ── Kafka Connect (with MySQL CDC & Datagen Connectors) ────────
-  kafka-connect:
-    <<: *restart-policy
-    image: confluentinc/cp-kafka-connect:7.8.0
-    hostname: kafka-connect
-    container_name: kafka-connect
-    ports:
-      - "8083:8083"
-    environment:
-      CONNECT_BOOTSTRAP_SERVERS: "kafka-broker:19092"
-      CONNECT_REST_PORT: 8083
-      CONNECT_GROUP_ID: compose-connect-group
-      CONNECT_CONFIG_STORAGE_TOPIC: docker-connect-configs
-      CONNECT_OFFSET_STORAGE_TOPIC: docker-connect-offsets
-      CONNECT_STATUS_STORAGE_TOPIC: docker-connect-status
-      CONNECT_KEY_CONVERTER: io.confluent.connect.avro.AvroConverter
-      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
-      CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
-      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
-      CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
-      CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
-      CONNECT_REST_ADVERTISED_HOST_NAME: "kafka-connect"
-      CONNECT_LOG4J_ROOT_LOGLEVEL: "INFO"
-      CONNECT_LOG4J_LOGGERS: "org.apache.kafka.connect.runtime.rest=WARN,org.reflections=ERROR"
-      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: "1"
-      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: "1"
-      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: "1"
-      CONNECT_PLUGIN_PATH: '/usr/share/java,/etc/kafka-connect/jars,/usr/share/confluent-hub-components'
-      KAFKA_JVM_PERFORMANCE_OPTS: "-Xms384M -Xmx512M -XX:+UseSerialGC"
-    volumes:
-      - ./connectors:/etc/kafka-connect/jars/
-    depends_on:
-      kafka-rest:
-        condition: service_started
-      schema-registry:
-        condition: service_healthy
-    networks:
-      - data-platform-net
-    command:
-      - bash
-      - -c
-      - |
-        confluent-hub install --no-prompt debezium/debezium-connector-mysql:latest
-        confluent-hub install --no-prompt confluentinc/kafka-connect-datagen:0.4.0
-        /etc/confluent/docker/run
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 768M
+  #   kafka-connect:
+  #     <<: *restart-policy
+  #     image: confluentinc/cp-kafka-connect:7.8.0
+  #     hostname: kafka-connect
+  #     container_name: kafka-connect
+  #     ports:
+  #       - "8083:8083"
+  #     environment:
+  #       CONNECT_BOOTSTRAP_SERVERS: "kafka-broker:19092"
+  #       CONNECT_REST_PORT: 8083
+  #       CONNECT_GROUP_ID: compose-connect-group
+  #       CONNECT_CONFIG_STORAGE_TOPIC: docker-connect-configs
+  #       CONNECT_OFFSET_STORAGE_TOPIC: docker-connect-offsets
+  #       CONNECT_STATUS_STORAGE_TOPIC: docker-connect-status
+  #       CONNECT_KEY_CONVERTER: io.confluent.connect.avro.AvroConverter
+  #       CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+  #       CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
+  #       CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+  #       CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+  #       CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+  #       CONNECT_REST_ADVERTISED_HOST_NAME: "kafka-connect"
+  #       CONNECT_LOG4J_ROOT_LOGLEVEL: "INFO"
+  #       CONNECT_LOG4J_LOGGERS: "org.apache.kafka.connect.runtime.rest=WARN,org.reflections=ERROR"
+  #       CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: "1"
+  #       CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: "1"
+  #       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: "1"
+  #       CONNECT_PLUGIN_PATH: '/usr/share/java,/etc/kafka-connect/jars,/usr/share/confluent-hub-components'
+  #       KAFKA_JVM_PERFORMANCE_OPTS: "-Xms384M -Xmx512M -XX:+UseSerialGC"
+  #     volumes:
+  #       - ./connectors:/etc/kafka-connect/jars/
+  #     depends_on:
+  #       kafka-rest:
+  #         condition: service_started
+  #       schema-registry:
+  #         condition: service_healthy
+  #     networks:
+  #       - data-platform-net
+  #     command:
+  #       - bash
+  #       - -c
+  #       - |
+  #         confluent-hub install --no-prompt debezium/debezium-connector-mysql:latest
+  #         confluent-hub install --no-prompt confluentinc/kafka-connect-datagen:0.4.0
+  #         /etc/confluent/docker/run
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '1.0'
+  #           memory: 768M
 
   # ── ksqlDB Server ──────────────────────────────────────────────
-  ksqldb:
-    <<: *restart-policy
-    image: confluentinc/cp-ksqldb-server:7.8.0
-    hostname: ksqldb
-    container_name: ksqldb
-    ports:
-      - "8088:8088"
-    environment:
-      KSQL_BOOTSTRAP_SERVERS: PLAINTEXT://kafka-broker:19092
-      KSQL_LISTENERS: http://0.0.0.0:8088/
-      KSQL_KSQL_SERVICE_ID: ksqldb-server_
-      KSQL_JVM_OPTS: "-Xms256M -Xmx384M -XX:+UseSerialGC"
-    depends_on:
-      kafka-broker:
-        condition: service_healthy
-    networks:
-      - data-platform-net
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
+  #   ksqldb:
+  #     <<: *restart-policy
+  #     image: confluentinc/cp-ksqldb-server:7.8.0
+  #     hostname: ksqldb
+  #     container_name: ksqldb
+  #     ports:
+  #       - "8088:8088"
+  #     environment:
+  #       KSQL_BOOTSTRAP_SERVERS: PLAINTEXT://kafka-broker:19092
+  #       KSQL_LISTENERS: http://0.0.0.0:8088/
+  #       KSQL_KSQL_SERVICE_ID: ksqldb-server_
+  #       KSQL_JVM_OPTS: "-Xms256M -Xmx384M -XX:+UseSerialGC"
+  #     depends_on:
+  #       kafka-broker:
+  #         condition: service_healthy
+  #     networks:
+  #       - data-platform-net
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.5'
+  #           memory: 512M
 
   # ── PostgreSQL (Conduktor Metadata DB) ──────────────────────────
-  conduktor-db:
-    <<: *restart-policy
-    image: postgres:16-alpine
-    hostname: conduktor-db
-    container_name: conduktor-db
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_DB: "conduktor-console"
-      POSTGRES_USER: "conduktor"
-      POSTGRES_PASSWORD: "${CONDUKTOR_PG_PASSWORD:-some_password}"
-    command: postgres -c shared_buffers=64MB -c max_connections=20
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U conduktor" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - data-platform-net
-    deploy:
-      resources:
-        limits:
-          cpus: '0.2'
-          memory: 192M
+  #   conduktor-db:
+  #     <<: *restart-policy
+  #     image: postgres:16-alpine
+  #     hostname: conduktor-db
+  #     container_name: conduktor-db
+  #     volumes:
+  #       - pg_data:/var/lib/postgresql/data
+  #     environment:
+  #       POSTGRES_DB: "conduktor-console"
+  #       POSTGRES_USER: "conduktor"
+  #       POSTGRES_PASSWORD: "${CONDUKTOR_PG_PASSWORD:-some_password}"
+  #     command: postgres -c shared_buffers=64MB -c max_connections=20
+  #     healthcheck:
+  #       test: [ "CMD-SHELL", "pg_isready -U conduktor" ]
+  #       interval: 10s
+  #       timeout: 5s
+  #       retries: 5
+  #     networks:
+  #       - data-platform-net
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.2'
+  #           memory: 192M
 
   # ── Conduktor Console ──────────────────────────────────────────
-  conduktor:
-    <<: *restart-policy
-    image: conduktor/conduktor-console:1.44.1
-    hostname: conduktor
-    container_name: conduktor
-    ports:
-      - "8080:8080"
-    volumes:
-      - conduktor_data:/var/conduktor
-    environment:
-      CDK_DATABASE_URL: "conduktor-db://conduktor:${CONDUKTOR_PG_PASSWORD:-some_password}@conduktor-db:5432/conduktor-console"
-      CDK_CLUSTERS_0_ID: "default"
-      CDK_CLUSTERS_0_NAME: "My Local Kafka Cluster"
-      CDK_CLUSTERS_0_COLOR: "#0013E7"
-      CDK_CLUSTERS_0_BOOTSTRAPSERVERS: "PLAINTEXT://kafka-broker:19092"
-      CDK_CLUSTERS_0_SCHEMAREGISTRY_URL: "http://schema-registry:8081"
-      CDK_CLUSTERS_0_KAFKACONNECTS_0_URL: "http://kafka-connect:8083"
-      CDK_CLUSTERS_0_KAFKACONNECTS_0_NAME: "full stack kafka connect"
-      CONSOLE_JAVA_OPTS: "-Xms256M -Xmx512M"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.conduktor.rule=Host(`conduktor.local`)"
-      - "traefik.http.routers.conduktor.entrypoints=web"
-      - "traefik.http.services.conduktor.loadbalancer.server.port=8080"
-    depends_on:
-      conduktor-db:
-        condition: service_healthy
-      schema-registry:
-        condition: service_healthy
-    networks:
-      - data-platform-net
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 2048M
+  #   conduktor:
+  #     <<: *restart-policy
+  #     image: conduktor/conduktor-console:1.44.1
+  #     hostname: conduktor
+  #     container_name: conduktor
+  #     ports:
+  #       - "8080:8080"
+  #     volumes:
+  #       - conduktor_data:/var/conduktor
+  #     environment:
+  #       CDK_DATABASE_URL: "conduktor-db://conduktor:${CONDUKTOR_PG_PASSWORD:-some_password}@conduktor-db:5432/conduktor-console"
+  #       CDK_CLUSTERS_0_ID: "default"
+  #       CDK_CLUSTERS_0_NAME: "My Local Kafka Cluster"
+  #       CDK_CLUSTERS_0_COLOR: "#0013E7"
+  #       CDK_CLUSTERS_0_BOOTSTRAPSERVERS: "PLAINTEXT://kafka-broker:19092"
+  #       CDK_CLUSTERS_0_SCHEMAREGISTRY_URL: "http://schema-registry:8081"
+  #       CDK_CLUSTERS_0_KAFKACONNECTS_0_URL: "http://kafka-connect:8083"
+  #       CDK_CLUSTERS_0_KAFKACONNECTS_0_NAME: "full stack kafka connect"
+  #       CONSOLE_JAVA_OPTS: "-Xms256M -Xmx512M"
+  #     labels:
+  #       - "traefik.enable=true"
+  #       - "traefik.http.routers.conduktor.rule=Host(`conduktor.local`)"
+  #       - "traefik.http.routers.conduktor.entrypoints=web"
+  #       - "traefik.http.services.conduktor.loadbalancer.server.port=8080"
+  #     depends_on:
+  #       conduktor-db:
+  #         condition: service_healthy
+  #       schema-registry:
+  #         condition: service_healthy
+  #     networks:
+  #       - data-platform-net
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.5'
+  #           memory: 2048M
 
   # ── Spark Master ───────────────────────────────────────────────
   spark-master:
@@ -590,7 +590,7 @@ services:
       resources:
         limits:
           cpus: '1.0'
-          memory: 768M
+          memory: 1536M
 
   # ── Spark History Server ───────────────────────────────────────
   spark-history:
@@ -703,472 +703,471 @@ services:
         limits:
           cpus: '1.5'
           memory: 2560M
-
   # ── Prometheus (Metrics Collection) ───────────────────────────
-  prometheus:
-    <<: *restart-policy
-    image: prom/prometheus:v2.51.2
-    container_name: prometheus
-    hostname: prometheus
-    ports:
-      - "9090:9090"
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=7d'
-      - '--web.enable-lifecycle'
-    volumes:
-      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    healthcheck:
-      test: [ "CMD", "nc", "-z", "localhost", "9090" ]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    depends_on:
-      spark-master:
-        condition: service_healthy
-    networks:
-      - data-platform-net
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
+  #   prometheus:
+  #     <<: *restart-policy
+  #     image: prom/prometheus:v2.51.2
+  #     container_name: prometheus
+  #     hostname: prometheus
+  #     ports:
+  #       - "9090:9090"
+  #     command:
+  #       - '--config.file=/etc/prometheus/prometheus.yml'
+  #       - '--storage.tsdb.path=/prometheus'
+  #       - '--storage.tsdb.retention.time=7d'
+  #       - '--web.enable-lifecycle'
+  #     volumes:
+  #       - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #       - prometheus_data:/prometheus
+  #     healthcheck:
+  #       test: [ "CMD", "nc", "-z", "localhost", "9090" ]
+  #       interval: 10s
+  #       timeout: 5s
+  #       retries: 3
+  #       start_period: 10s
+  #     depends_on:
+  #       spark-master:
+  #         condition: service_healthy
+  #     networks:
+  #       - data-platform-net
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.5'
+  #           memory: 512M
 
   # ── Grafana (Dashboards) ───────────────────────────────────────
-  grafana:
-    <<: *restart-policy
-    image: grafana/grafana:10.4.2
-    container_name: grafana
-    hostname: grafana
-    ports:
-      - "3001:3000"
-    environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
-      GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_ANALYTICS_REPORTING_ENABLED: "false"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
-    depends_on:
-      prometheus:
-        condition: service_healthy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.grafana.rule=Host(`grafana.local`)"
-      - "traefik.http.routers.grafana.entrypoints=web"
-      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
-    networks:
-      - data-platform-net
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1" ]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: '0.3'
-          memory: 256M
+  #   grafana:
+  #     <<: *restart-policy
+  #     image: grafana/grafana:10.4.2
+  #     container_name: grafana
+  #     hostname: grafana
+  #     ports:
+  #       - "3001:3000"
+  #     environment:
+  #       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+  #       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+  #       GF_USERS_ALLOW_SIGN_UP: "false"
+  #       GF_ANALYTICS_REPORTING_ENABLED: "false"
+  #     volumes:
+  #       - grafana_data:/var/lib/grafana
+  #       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+  #     depends_on:
+  #       prometheus:
+  #         condition: service_healthy
+  #     labels:
+  #       - "traefik.enable=true"
+  #       - "traefik.http.routers.grafana.rule=Host(`grafana.local`)"
+  #       - "traefik.http.routers.grafana.entrypoints=web"
+  #       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+  #     networks:
+  #       - data-platform-net
+  #     healthcheck:
+  #       test: [ "CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1" ]
+  #       interval: 15s
+  #       timeout: 5s
+  #       retries: 5
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.3'
+  #           memory: 256M
 
   # ── Elasticsearch (Search engine for OpenMetadata) ─────────────
-  elasticsearch:
-    <<: *restart-policy
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
-    container_name: elasticsearch
-    hostname: elasticsearch
-    ports:
-      - "9200:9200"
-    environment:
-      discovery.type: single-node
-      ES_JAVA_OPTS: -Xms768m -Xmx768m
-      xpack.security.enabled: "false"
-      xpack.ml.enabled: "false"
-      bootstrap.memory_lock: "true"
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-      nofile:
-        soft: 65536
-        hard: 65536
-    volumes:
-      - es_data:/usr/share/elasticsearch/data
-    networks:
-      - data-platform-net
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'" ]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-      start_period: 60s
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1536M
+  #   elasticsearch:
+  #     <<: *restart-policy
+  #     image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
+  #     container_name: elasticsearch
+  #     hostname: elasticsearch
+  #     ports:
+  #       - "9200:9200"
+  #     environment:
+  #       discovery.type: single-node
+  #       ES_JAVA_OPTS: -Xms768m -Xmx768m
+  #       xpack.security.enabled: "false"
+  #       xpack.ml.enabled: "false"
+  #       bootstrap.memory_lock: "true"
+  #     ulimits:
+  #       memlock:
+  #         soft: -1
+  #         hard: -1
+  #       nofile:
+  #         soft: 65536
+  #         hard: 65536
+  #     volumes:
+  #       - es_data:/usr/share/elasticsearch/data
+  #     networks:
+  #       - data-platform-net
+  #     healthcheck:
+  #       test: [ "CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'" ]
+  #       interval: 15s
+  #       timeout: 10s
+  #       retries: 10
+  #       start_period: 60s
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '1.0'
+  #           memory: 1536M
 
   # ── Kibana (UI for Elasticsearch) ──────────────────────────────
-  kibana:
-    <<: *restart-policy
-    image: docker.elastic.co/kibana/kibana:8.10.2
-    container_name: kibana
-    hostname: kibana
-    ports:
-      - "5601:5601"
-    environment:
-      ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
-    networks:
-      - data-platform-net
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 1024M
+  #   kibana:
+  #     <<: *restart-policy
+  #     image: docker.elastic.co/kibana/kibana:8.10.2
+  #     container_name: kibana
+  #     hostname: kibana
+  #     ports:
+  #       - "5601:5601"
+  #     environment:
+  #       ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
+  #     networks:
+  #       - data-platform-net
+  #     depends_on:
+  #       elasticsearch:
+  #         condition: service_healthy
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.5'
+  #           memory: 1024M
 
   # ── OpenMetadata (Data Governance — Catalog + Lineage) ─────────
-  openmetadata:
-    <<: *restart-policy
-    image: openmetadata/server:1.3.1
-    container_name: openmetadata
-    hostname: openmetadata
-    ports:
-      - "8585:8585"
-    environment:
-      OPENMETADATA_CLUSTER_NAME: "pyspark-platform"
-      DB_DRIVER_CLASS: "org.postgresql.Driver"
-      DB_SCHEME: "postgresql"
-      DB_HOST: "postgres"
-      DB_PORT: "5432"
-      DB_USER: "${OPENMETADATA_DB_USER:-openmetadata}"
-      DB_USER_PASSWORD: "${OPENMETADATA_DB_PASSWORD:-openmetadata}"
-      DB_NAME: "openmetadata"
-      SEARCH_TYPE: "elasticsearch"
-      ELASTICSEARCH_HOST: "elasticsearch"
-      ELASTICSEARCH_PORT: "9200"
-      ELASTICSEARCH_SCHEME: "http"
-      AUTHENTICATION_PROVIDER: "basic"
-      JAVA_OPTS: "-Xms512M -Xmx768M -XX:+UseSerialGC -XX:MaxMetaspaceSize=256m"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.openmetadata.rule=Host(`openmetadata.local`)"
-      - "traefik.http.routers.openmetadata.entrypoints=web"
-      - "traefik.http.services.openmetadata.loadbalancer.server.port=8585"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      elasticsearch:
-        condition: service_healthy
-    networks:
-      - data-platform-net
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8585/api/v1/system/version" ]
-      interval: 20s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1536M
+  #   openmetadata:
+  #     <<: *restart-policy
+  #     image: openmetadata/server:1.3.1
+  #     container_name: openmetadata
+  #     hostname: openmetadata
+  #     ports:
+  #       - "8585:8585"
+  #     environment:
+  #       OPENMETADATA_CLUSTER_NAME: "pyspark-platform"
+  #       DB_DRIVER_CLASS: "org.postgresql.Driver"
+  #       DB_SCHEME: "postgresql"
+  #       DB_HOST: "postgres"
+  #       DB_PORT: "5432"
+  #       DB_USER: "${OPENMETADATA_DB_USER:-openmetadata}"
+  #       DB_USER_PASSWORD: "${OPENMETADATA_DB_PASSWORD:-openmetadata}"
+  #       DB_NAME: "openmetadata"
+  #       SEARCH_TYPE: "elasticsearch"
+  #       ELASTICSEARCH_HOST: "elasticsearch"
+  #       ELASTICSEARCH_PORT: "9200"
+  #       ELASTICSEARCH_SCHEME: "http"
+  #       AUTHENTICATION_PROVIDER: "basic"
+  #       JAVA_OPTS: "-Xms512M -Xmx768M -XX:+UseSerialGC -XX:MaxMetaspaceSize=256m"
+  #     labels:
+  #       - "traefik.enable=true"
+  #       - "traefik.http.routers.openmetadata.rule=Host(`openmetadata.local`)"
+  #       - "traefik.http.routers.openmetadata.entrypoints=web"
+  #       - "traefik.http.services.openmetadata.loadbalancer.server.port=8585"
+  #     depends_on:
+  #       postgres:
+  #         condition: service_healthy
+  #       elasticsearch:
+  #         condition: service_healthy
+  #     networks:
+  #       - data-platform-net
+  #     healthcheck:
+  #       test: [ "CMD", "curl", "-f", "http://localhost:8585/api/v1/system/version" ]
+  #       interval: 20s
+  #       timeout: 10s
+  #       retries: 5
+  #       start_period: 60s
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '1.0'
+  #           memory: 1536M
 
   # ── Traefik (Reverse Proxy & Service Discovery) ──────────────
-  traefik:
-    <<: *restart-policy
-    image: traefik:v3.3
-    container_name: traefik
-    hostname: traefik
-    user: root
-    ports:
-      - "80:80"
-      - "8089:8080"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./config/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-    networks:
-      - data-platform-net
-    deploy:
-      resources:
-        limits:
-          cpus: '0.2'
-          memory: 128M
+  #   traefik:
+  #     <<: *restart-policy
+  #     image: traefik:v3.3
+  #     container_name: traefik
+  #     hostname: traefik
+  #     user: root
+  #     ports:
+  #       - "80:80"
+  #       - "8089:8080"
+  #     volumes:
+  #       - /var/run/docker.sock:/var/run/docker.sock:ro
+  #       - ./config/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+  #     networks:
+  #       - data-platform-net
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.2'
+  #           memory: 128M
 
   # ── Airflow API Server ─────────────────────────────────────────
-  airflow-web:
-    <<: *airflow-common
-    container_name: airflow-web
-    command: api-server
-    ports:
-      - "8086:8080"
-    healthcheck:
-      test: [ "CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    restart: always
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.airflow.rule=Host(`airflow.local`)"
-      - "traefik.http.routers.airflow.entrypoints=web"
-      - "traefik.http.services.airflow.loadbalancer.server.port=8080"
-    depends_on:
-      <<: *airflow-common-depends-on
-      airflow-init:
-        condition: service_completed_successfully
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
+  #   airflow-web:
+  #     <<: *airflow-common
+  #     container_name: airflow-web
+  #     command: api-server
+  #     ports:
+  #       - "8086:8080"
+  #     healthcheck:
+  #       test: [ "CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health" ]
+  #       interval: 30s
+  #       timeout: 10s
+  #       retries: 5
+  #       start_period: 30s
+  #     restart: always
+  #     labels:
+  #       - "traefik.enable=true"
+  #       - "traefik.http.routers.airflow.rule=Host(`airflow.local`)"
+  #       - "traefik.http.routers.airflow.entrypoints=web"
+  #       - "traefik.http.services.airflow.loadbalancer.server.port=8080"
+  #     depends_on:
+  #       <<: *airflow-common-depends-on
+  #       airflow-init:
+  #         condition: service_completed_successfully
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.5'
+  #           memory: 512M
 
   # ── Airflow Scheduler ──────────────────────────────────────────
-  airflow-scheduler:
-    <<: *airflow-common
-    container_name: airflow-scheduler
-    command: scheduler
-    healthcheck:
-      test: [ "CMD", "curl", "--fail", "http://localhost:8974/health" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    restart: always
-    depends_on:
-      <<: *airflow-common-depends-on
-      airflow-init:
-        condition: service_completed_successfully
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
+  #   airflow-scheduler:
+  #     <<: *airflow-common
+  #     container_name: airflow-scheduler
+  #     command: scheduler
+  #     healthcheck:
+  #       test: [ "CMD", "curl", "--fail", "http://localhost:8974/health" ]
+  #       interval: 30s
+  #       timeout: 10s
+  #       retries: 5
+  #       start_period: 30s
+  #     restart: always
+  #     depends_on:
+  #       <<: *airflow-common-depends-on
+  #       airflow-init:
+  #         condition: service_completed_successfully
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.5'
+  #           memory: 512M
 
   # ── Airflow DAG Processor ──────────────────────────────────────
-  orch-airflow-dag-processor:
-    <<: *airflow-common
-    container_name: orch-airflow-dag-processor
-    command: dag-processor
-    healthcheck:
-      test: [ "CMD-SHELL", "pgrep -f 'airflow dag-processor' || exit 1" ]
-      interval: 60s
-      timeout: 30s
-      retries: 5
-      start_period: 30s
-    restart: always
-    depends_on:
-      <<: *airflow-common-depends-on
-      airflow-init:
-        condition: service_completed_successfully
-    deploy:
-      resources:
-        limits:
-          cpus: '0.2'
-          memory: 640M
+  #   orch-airflow-dag-processor:
+  #     <<: *airflow-common
+  #     container_name: orch-airflow-dag-processor
+  #     command: dag-processor
+  #     healthcheck:
+  #       test: [ "CMD-SHELL", "pgrep -f 'airflow dag-processor' || exit 1" ]
+  #       interval: 60s
+  #       timeout: 30s
+  #       retries: 5
+  #       start_period: 30s
+  #     restart: always
+  #     depends_on:
+  #       <<: *airflow-common-depends-on
+  #       airflow-init:
+  #         condition: service_completed_successfully
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.2'
+  #           memory: 640M
 
   # ── Airflow Worker ─────────────────────────────────────────────
-  airflow-worker:
-    <<: *airflow-common
-    container_name: airflow-worker
-    command: celery worker
-    healthcheck:
-      test: [ "CMD-SHELL", 'celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}" || celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"' ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    environment:
-      <<: *airflow-common-env
-      DUMB_INIT_SETSID: "0"
-    restart: always
-    depends_on:
-      <<: *airflow-common-depends-on
-      airflow-web:
-        condition: service_healthy
-      airflow-init:
-        condition: service_completed_successfully
-    deploy:
-      resources:
-        limits:
-          cpus: '0.8'
-          memory: 768M
+  #   airflow-worker:
+  #     <<: *airflow-common
+  #     container_name: airflow-worker
+  #     command: celery worker
+  #     healthcheck:
+  #       test: [ "CMD-SHELL", 'celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}" || celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"' ]
+  #       interval: 30s
+  #       timeout: 10s
+  #       retries: 5
+  #       start_period: 30s
+  #     environment:
+  #       <<: *airflow-common-env
+  #       DUMB_INIT_SETSID: "0"
+  #     restart: always
+  #     depends_on:
+  #       <<: *airflow-common-depends-on
+  #       airflow-web:
+  #         condition: service_healthy
+  #       airflow-init:
+  #         condition: service_completed_successfully
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.8'
+  #           memory: 768M
 
   # ── Airflow Triggerer ──────────────────────────────────────────
-  airflow-triggerer:
-    <<: *airflow-common
-    container_name: airflow-triggerer
-    command: triggerer
-    healthcheck:
-      test: [ "CMD-SHELL", "pgrep -f 'airflow triggerer' || exit 1" ]
-      interval: 60s
-      timeout: 30s
-      retries: 5
-      start_period: 30s
-    restart: always
-    depends_on:
-      <<: *airflow-common-depends-on
-      airflow-init:
-        condition: service_completed_successfully
-    deploy:
-      resources:
-        limits:
-          cpus: '0.2'
-          memory: 640M
+  #   airflow-triggerer:
+  #     <<: *airflow-common
+  #     container_name: airflow-triggerer
+  #     command: triggerer
+  #     healthcheck:
+  #       test: [ "CMD-SHELL", "pgrep -f 'airflow triggerer' || exit 1" ]
+  #       interval: 60s
+  #       timeout: 30s
+  #       retries: 5
+  #       start_period: 30s
+  #     restart: always
+  #     depends_on:
+  #       <<: *airflow-common-depends-on
+  #       airflow-init:
+  #         condition: service_completed_successfully
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.2'
+  #           memory: 640M
 
   # ── Airflow Init (runs once to migrate DB and create admin) ────
-  airflow-init:
-    <<: *airflow-common
-    container_name: airflow-init
-    command:
-      - bash
-      - -c
-      - |
-        if [[ -z "${AIRFLOW_UID}" ]]; then
-          export AIRFLOW_UID=50000
-        fi
-        mkdir -v -p /opt/airflow/{logs,dags,plugins,config}
-        airflow db migrate
-        airflow users create \
-          --username ${AIRFLOW_ADMIN_USER:-admin} --password ${AIRFLOW_ADMIN_PASSWORD:-admin} \
-          --role Admin --email admin@platform.local || true
-        airflow connections delete spark_default || true
-        airflow connections add spark_default \
-          --conn-type spark \
-          --conn-host spark://spark-master \
-          --conn-port 7077
-        echo "✅ Airflow init complete"
-    environment:
-      <<: *airflow-common-env
-      _AIRFLOW_DB_MIGRATE: 'true'
-      _AIRFLOW_WWW_USER_CREATE: 'true'
-      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
-      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
-      _PIP_ADDITIONAL_REQUIREMENTS: ''
+  #   airflow-init:
+  #     <<: *airflow-common
+  #     container_name: airflow-init
+  #     command:
+  #       - bash
+  #       - -c
+  #       - |
+  #         if [[ -z "${AIRFLOW_UID}" ]]; then
+  #           export AIRFLOW_UID=50000
+  #         fi
+  #         mkdir -v -p /opt/airflow/{logs,dags,plugins,config}
+  #         airflow db migrate
+  #         airflow users create \
+  #           --username ${AIRFLOW_ADMIN_USER:-admin} --password ${AIRFLOW_ADMIN_PASSWORD:-admin} \
+  #           --role Admin --email admin@platform.local || true
+  #         airflow connections delete spark_default || true
+  #         airflow connections add spark_default \
+  #           --conn-type spark \
+  #           --conn-host spark://spark-master \
+  #           --conn-port 7077
+  #         echo "✅ Airflow init complete"
+  #     environment:
+  #       <<: *airflow-common-env
+  #       _AIRFLOW_DB_MIGRATE: 'true'
+  #       _AIRFLOW_WWW_USER_CREATE: 'true'
+  #       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
+  #       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
+  #       _PIP_ADDITIONAL_REQUIREMENTS: ''
 
   # ── Airflow CLI (Debug Tool) ───────────────────────────────────
-  airflow-cli:
-    <<: *airflow-common
-    container_name: airflow-cli
-    profiles:
-      - debug
-    environment:
-      <<: *airflow-common-env
-      CONNECTION_CHECK_MAX_COUNT: "0"
-    command:
-      - bash
-      - -c
-      - airflow
-    depends_on:
-      <<: *airflow-common-depends-on
+  #   airflow-cli:
+  #     <<: *airflow-common
+  #     container_name: airflow-cli
+  #     profiles:
+  #       - debug
+  #     environment:
+  #       <<: *airflow-common-env
+  #       CONNECTION_CHECK_MAX_COUNT: "0"
+  #     command:
+  #       - bash
+  #       - -c
+  #       - airflow
+  #     depends_on:
+  #       <<: *airflow-common-depends-on
 
   # ── Flower (Celery Dashboard) ──────────────────────────────────
-  orch-flower:
-    <<: *airflow-common
-    container_name: orch-flower
-    command: celery flower
-    profiles:
-      - orch-flower
-    ports:
-      - "5555:5555"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.orch-flower.rule=Host(`orch-flower.local`)"
-      - "traefik.http.routers.orch-flower.entrypoints=web"
-      - "traefik.http.services.orch-flower.loadbalancer.server.port=5555"
-    healthcheck:
-      test: [ "CMD", "curl", "--fail", "http://localhost:5555/" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    restart: always
-    depends_on:
-      <<: *airflow-common-depends-on
-      airflow-init:
-        condition: service_completed_successfully
-    deploy:
-      resources:
-        limits:
-          cpus: '0.2'
-          memory: 128M
+  #   orch-flower:
+  #     <<: *airflow-common
+  #     container_name: orch-flower
+  #     command: celery flower
+  #     profiles:
+  #       - orch-flower
+  #     ports:
+  #       - "5555:5555"
+  #     labels:
+  #       - "traefik.enable=true"
+  #       - "traefik.http.routers.orch-flower.rule=Host(`orch-flower.local`)"
+  #       - "traefik.http.routers.orch-flower.entrypoints=web"
+  #       - "traefik.http.services.orch-flower.loadbalancer.server.port=5555"
+  #     healthcheck:
+  #       test: [ "CMD", "curl", "--fail", "http://localhost:5555/" ]
+  #       interval: 30s
+  #       timeout: 10s
+  #       retries: 5
+  #       start_period: 30s
+  #     restart: always
+  #     depends_on:
+  #       <<: *airflow-common-depends-on
+  #       airflow-init:
+  #         condition: service_completed_successfully
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.2'
+  #           memory: 128M
 
   # ── Apache Superset (BI Dashboards on real data) ───────────────
-  bi-superset-init:
-    <<: *restart-policy
-    image: apache/superset:3.1.3
-    container_name: bi-superset-init
-    environment:
-      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
-      DATABASE_URL: postgresql+psycopg2://bi-superset:superset@postgres:5432/superset
-      SUPERSET_CONFIG_PATH: /app/superset_config.py
-    dns:
-      - 8.8.8.8
-    volumes:
-      - ./config/superset/superset_config.py:/app/superset_config.py
-    command: >
-      bash -c "pip install --quiet psycopg2-binary clickhouse-connect && superset db upgrade && superset fab create-admin --username ${SUPERSET_ADMIN_USER:-admin} --firstname Admin --lastname User --email admin@superset.local --password ${SUPERSET_ADMIN_PASSWORD:-admin} || true && superset init && echo '✅ Superset init complete'"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - data-platform-net
-    restart: "no"
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
+  #   bi-superset-init:
+  #     <<: *restart-policy
+  #     image: apache/superset:3.1.3
+  #     container_name: bi-superset-init
+  #     environment:
+  #       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+  #       DATABASE_URL: postgresql+psycopg2://bi-superset:superset@postgres:5432/superset
+  #       SUPERSET_CONFIG_PATH: /app/superset_config.py
+  #     dns:
+  #       - 8.8.8.8
+  #     volumes:
+  #       - ./config/superset/superset_config.py:/app/superset_config.py
+  #     command: >
+  #       bash -c "pip install --quiet psycopg2-binary clickhouse-connect && superset db upgrade && superset fab create-admin --username ${SUPERSET_ADMIN_USER:-admin} --firstname Admin --lastname User --email admin@superset.local --password ${SUPERSET_ADMIN_PASSWORD:-admin} || true && superset init && echo '✅ Superset init complete'"
+  #     depends_on:
+  #       postgres:
+  #         condition: service_healthy
+  #     networks:
+  #       - data-platform-net
+  #     restart: "no"
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.5'
+  #           memory: 512M
 
-  bi-superset:
-    <<: *restart-policy
-    image: apache/superset:3.1.3
-    container_name: bi-superset
-    hostname: bi-superset
-    ports:
-      - "8087:8088"
-    environment:
-      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
-      DATABASE_URL: postgresql+psycopg2://bi-superset:superset@postgres:5432/superset
-      SUPERSET_CONFIG_PATH: /app/superset_config.py
-      SUPERSET_LOAD_EXAMPLES: "no"
-    dns:
-      - 8.8.8.8
-    volumes:
-      - ./config/superset/superset_config.py:/app/superset_config.py
-    command: gunicorn --bind 0.0.0.0:8088 --timeout 120 --workers 2 "superset.app:create_app()"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.bi-superset.rule=Host(`bi-superset.local`)"
-      - "traefik.http.routers.bi-superset.entrypoints=web"
-      - "traefik.http.services.bi-superset.loadbalancer.server.port=8088"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      bi-superset-init:
-        condition: service_completed_successfully
-    networks:
-      - data-platform-net
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8088/health" ]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 768M
+  #   bi-superset:
+  #     <<: *restart-policy
+  #     image: apache/superset:3.1.3
+  #     container_name: bi-superset
+  #     hostname: bi-superset
+  #     ports:
+  #       - "8087:8088"
+  #     environment:
+  #       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+  #       DATABASE_URL: postgresql+psycopg2://bi-superset:superset@postgres:5432/superset
+  #       SUPERSET_CONFIG_PATH: /app/superset_config.py
+  #       SUPERSET_LOAD_EXAMPLES: "no"
+  #     dns:
+  #       - 8.8.8.8
+  #     volumes:
+  #       - ./config/superset/superset_config.py:/app/superset_config.py
+  #     command: gunicorn --bind 0.0.0.0:8088 --timeout 120 --workers 2 "superset.app:create_app()"
+  #     labels:
+  #       - "traefik.enable=true"
+  #       - "traefik.http.routers.bi-superset.rule=Host(`bi-superset.local`)"
+  #       - "traefik.http.routers.bi-superset.entrypoints=web"
+  #       - "traefik.http.services.bi-superset.loadbalancer.server.port=8088"
+  #     depends_on:
+  #       postgres:
+  #         condition: service_healthy
+  #       bi-superset-init:
+  #         condition: service_completed_successfully
+  #     networks:
+  #       - data-platform-net
+  #     healthcheck:
+  #       test: [ "CMD", "curl", "-f", "http://localhost:8088/health" ]
+  #       interval: 15s
+  #       timeout: 5s
+  #       retries: 5
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '0.5'
+  #           memory: 768M
 
-# ================================================================
-# Volumes
-# ================================================================
+  # ================================================================
+  # Volumes
+  # ================================================================
 volumes:
   postgres_data:
   minio_data:
