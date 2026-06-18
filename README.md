@@ -44,17 +44,17 @@ git pull origin main
 
 عشان تشغل المعمل على جهازك، اتبع الخطوات دي:
 
-### 1. إعداد البيئة (أول مرة فقط)
-اعمل نسخة من ملف الإعدادات:
-```bash
-cp .env.example .env
-```
+
 *(لو إنت شغال على Linux/Mac، اتأكد إن السكريبت معاه صلاحية التشغيل: `chmod +x build_and_push.sh`)*
 
 ### 2. تشغيل المعمل
 شغل السكريبت المساعد:
 ```bash
 ./build_and_push.sh
+```
+**أو يمكنك استخدام الأمر المباشر لبناء خدمات Spark والـ Data Lakehouse فقط:**
+```bash
+docker compose up -d --build postgres minio spark-master spark-worker-1 spark-worker-2 jupyter-workspace spark-history nessie dremio clickhouse
 ```
 
 **أو يمكنك استخدام الأمر المباشر لتشغيل خدمات Spark والـ Data Lakehouse فقط:**
@@ -75,17 +75,20 @@ docker compose up -d postgres minio spark-master spark-worker-1 spark-worker-2 j
 
 بعد ما المعمل يشتغل بنجاح، افتح المتصفح بتاعك وادخل على الروابط دي:
 
-| الأداة (Service) | الرابط (URL) | الباسورد / المستخدم |
+| الأداة (Service) | الرابط (URL) / المنفذ (Port) | الباسورد / المستخدم |
 |---|---|---|
 | **Jupyter Lab** (كتابة الكود) | [http://localhost:8889](http://localhost:8889) | `admin` |
 | **Spark Master UI** (مراقبة المهام) | [http://localhost:8085](http://localhost:8085) | - |
 | **Spark Worker 1** (العامل الأول) | [http://localhost:8092](http://localhost:8092) | - |
 | **Spark Worker 2** (العامل الثاني) | [http://localhost:8093](http://localhost:8093) | - |
 | **Spark History** (مراجعة المهام) | [http://localhost:18080](http://localhost:18080) | - |
-| **MinIO Console** (رفع الداتا) | [http://localhost:9008](http://localhost:9008) | `minioadmin` / `minioadmin` |
+| **MinIO Console** (واجهة المستخدم - رفع الداتا) | [http://localhost:9008](http://localhost:9008) | `minioadmin` / `minioadmin` |
+| **MinIO API** (للاتصال البرمجي - S3) | `localhost:9005` | `minioadmin` / `minioadmin` |
 | **PostgreSQL** (قاعدة البيانات) | `localhost:5432` | `postgres` / `postgres` |
 | **Dremio** | [http://localhost:9047](http://localhost:9047) | - |
 | **Nessie Catalog** | [http://localhost:19120](http://localhost:19120) | - |
+| **ClickHouse UI** (واجهة الـ Play) | [http://localhost:8123/play](http://localhost:8123/play) | `admin` / `admin` |
+| **ClickHouse Native** (للاتصال السريع) | `localhost:9009` | `admin` / `admin` |
 
 ---
 
